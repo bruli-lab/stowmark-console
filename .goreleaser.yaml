@@ -1,0 +1,50 @@
+version: 2
+
+project_name: stowmark_console
+
+builds:
+  - id: stowmark_console
+    main: ./cmd/console
+    binary: stowmark_console
+
+    env:
+      - CGO_ENABLED=0
+
+    goos:
+      - linux
+
+    goarch:
+      - amd64
+      - arm64
+
+nfpms:
+  - id: stowmark_console_deb
+    package_name: stowmark_console
+
+    ids:
+      - stowmark_console
+
+    vendor: bruli-lab
+    homepage: https://stowmark.dev
+    maintainer: Pablo Braulio <brulics@gmail.com>
+    description: Immutable snapshot backup tool. Console ui tool.
+    license: Apache-2.0
+
+    formats:
+      - deb
+
+    bindir: /usr/bin
+    section: utils
+    priority: optional
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-devel"
+
+changelog:
+  disable: true
+
+release:
+  mode: keep-existing

@@ -1,0 +1,7 @@
+package console
+
+const stowmarkLogo = `   =====
+   //    '
+  ======
+        // 
+'=====`
