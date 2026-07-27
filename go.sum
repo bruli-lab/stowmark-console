@@ -6,6 +6,8 @@ github.com/bruli-lab/go-core v1.7.0 h1:vOAfcnhZMNgUCYbWVWDHkXQgMCDyt74iEB2ZixHpw
 github.com/bruli-lab/go-core v1.7.0/go.mod h1:NrVGaVHAJJ2fxNS0kOwJc4VPLdi5VfJY08gQLNkhquk=
 github.com/bruli-lab/stowmark v1.1.2 h1:lyT/tOmmydxPfl5QOVo6IAS3rh+W+l/bD4FJ9v6b0UM=
 github.com/bruli-lab/stowmark v1.1.2/go.mod h1:0iAb4HDGCWPhA4Aa49AXybmvllwU3/Y3RjA16zpF1+E=
+github.com/bruli-lab/stowmark v1.1.3 h1:YQX8BZMSEdiTknX8gtOep9myOrg73wzmLPiG83PMLLI=
+github.com/bruli-lab/stowmark v1.1.3/go.mod h1:0iAb4HDGCWPhA4Aa49AXybmvllwU3/Y3RjA16zpF1+E=
 github.com/charmbracelet/bubbletea v1.3.10 h1:otUDHWMMzQSB0Pkc87rm691KZ3SWa4KUlvF9nRvCICw=
 github.com/charmbracelet/bubbletea v1.3.10/go.mod h1:ORQfo0fk8U+po9VaNvnV95UPWA1BitP1E0N6xJPlHr4=
 github.com/charmbracelet/colorprofile v0.3.1 h1:k8dTHMd7fgw4bnFd7jXTLZrSU/CQrKnL3m+AxCzDz40=
