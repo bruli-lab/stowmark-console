@@ -111,7 +111,7 @@ func (m *Model) activeSection() string {
 		return "repository"
 	}
 
-	firstDirectory := strings.Split(relativePath, string(filepath.Separator))[0]
+	firstDirectory, _, _ := strings.Cut(relativePath, string(filepath.Separator))
 
 	switch strings.ToLower(firstDirectory) {
 	case "snapshots":
