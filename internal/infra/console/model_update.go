@@ -172,6 +172,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 					m.ctx,
 					m.repoPath,
 					origin,
+					m.privateKey,
 				)
 
 			case "backspace":
@@ -206,6 +207,8 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 					m.ctx,
 					m.repoPath,
 					snapshotID,
+					m.destinationPath,
+					m.privateKey,
 				)
 
 			case "n", "N", "esc", "q":
@@ -327,7 +330,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.loading = true
 			m.message = "Verifying snapshot..."
-			return m, verifySnapshotCmd(m.ctx, m.repoPath, snapshotID)
+			return m, verifySnapshotCmd(m.ctx, m.repoPath, snapshotID, m.privateKey)
 
 		case "x":
 			snapshotPath, ok := m.selectedSnapshotPath()

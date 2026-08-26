@@ -10,9 +10,12 @@ import (
 func initRepositoryCmd(
 	ctx context.Context,
 	repositoryPath string,
+	formatVersion int,
+	publicKey *string,
+	force bool,
 ) tea.Cmd {
 	return func() tea.Msg {
-		handler, err := stowmark.NewHandler(repositoryPath)
+		handler, err := stowmark.NewHandler(ctx, repositoryPath)
 		if err != nil {
 			return initRepositoryMsg{err: err}
 		}
@@ -21,7 +24,7 @@ func initRepositoryCmd(
 			Type:  "none",
 			Level: nil,
 		}
-		if err := handler.Init(ctx, repositoryPath, &compression); err != nil {
+		if err := handler.Init(ctx, &compression, formatVersion, publicKey, force); err != nil {
 			return initRepositoryMsg{err: err}
 		}
 
