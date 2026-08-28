@@ -26,7 +26,7 @@ Stowmark Console provides a compact, keyboard-driven interface for inspecting re
 ## Requirements
 
 - Linux
-- Go 1.26.5 or newer when building from source
+- Go 1.27.0 or newer when building from source
 - A terminal with color support
 - An optional terminal editor for the edit action
 

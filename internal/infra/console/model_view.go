@@ -128,7 +128,6 @@ func (m *Model) renderHeader() string {
 	return title + strings.Repeat(" ", spaces) + repositoryPath
 }
 
-
 func (m *Model) renderFooter() string {
 	var help string
 

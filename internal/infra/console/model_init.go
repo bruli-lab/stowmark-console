@@ -1,8 +1,8 @@
 package console
 
 import (
-	"path/filepath"
 	"os"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -10,7 +10,7 @@ import (
 func (m *Model) Init() tea.Cmd {
 	configPath := filepath.Join(m.repoPath, "config.json")
 
-	_, err :=  os.Stat(configPath)
+	_, err := os.Stat(configPath)
 	switch {
 	case err == nil:
 		return loadRepositoryContent(
