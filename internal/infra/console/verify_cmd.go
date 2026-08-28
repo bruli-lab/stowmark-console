@@ -9,16 +9,16 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func verifySnapshotCmd(ctx context.Context, repositoryPath, snapshotID string) tea.Cmd {
+func verifySnapshotCmd(ctx context.Context, repositoryPath, snapshotID string, privateKey *string) tea.Cmd {
 	return func() tea.Msg {
 		msg := snapshotVerifiedMsg{}
 		msg.snapshotID = snapshotID
-		hand, err := stowmark.NewHandler(repositoryPath)
+		hand, err := stowmark.NewHandler(ctx, repositoryPath)
 		if err != nil {
 			msg.err = err
 			return msg
 		}
-		result, err := hand.VerifySnapshot(ctx, snapshotID)
+		result, err := hand.VerifySnapshot(ctx, snapshotID, privateKey)
 		if err != nil {
 			msg.err = err
 			return msg

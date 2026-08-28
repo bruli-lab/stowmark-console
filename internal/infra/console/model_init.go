@@ -26,6 +26,9 @@ func (m *Model) Init() tea.Cmd {
 		return initRepositoryCmd(
 			m.ctx,
 			m.repoPath,
+			m.formatVersion,
+			m.publicKey,
+			m.force,
 		)
 
 	default:

@@ -38,6 +38,11 @@ type Model struct {
 	snapshotOrigin    string
 	snapshotFormError string
 	preserveMessage   bool
+	formatVersion     int
+	publicKey         *string
+	force             bool
+	privateKey        *string
+	destinationPath   *string
 }
 
 func New(ctx context.Context, conf *config.Config) Model {
