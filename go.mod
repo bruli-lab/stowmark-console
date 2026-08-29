@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/bruli-lab/stowmark v1.12.0
 	github.com/charmbracelet/bubbletea v1.3.10
-	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/charmbracelet/lipgloss/v2 v2.0.6
 	github.com/stretchr/testify v1.12.1
 )
 
