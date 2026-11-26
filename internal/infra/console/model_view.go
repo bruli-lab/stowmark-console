@@ -56,7 +56,7 @@ func (m *Model) renderLayout() string {
 }
 
 func (m *Model) renderHeader() string {
-	title := titleStyle.Render("STOWMARK")
+	title := titleStyle.Render("STOWMARK") + " " + kindStyle.Render(repositoryKind(m.settings.RepositoryPath))
 	location := m.settings.RepositoryPath
 
 	if m.view == filesView {

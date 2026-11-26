@@ -21,8 +21,7 @@ Stowmark Console provides a compact, keyboard-driven interface for listing snaps
 - Cancel a running operation with `Esc`
 - Navigate using arrow keys or Vim-style key bindings
 
-> [!NOTE]
-> The current implementation operates on local repositories.
+Every repository type supported by Stowmark works: local paths, SSH/SFTP, S3, SMB, WebDAV and Google Cloud Storage.
 
 ## Requirements
 
@@ -74,6 +73,20 @@ STOWMARK_REPOSITORY="$HOME/backups/stowmark" stowmark_console
 If the path does not contain a Stowmark repository yet, the console asks for confirmation before initializing one there. Declining quits without touching the disk.
 
 While the console is running, Stowmark log output is written to a log file (see `STOWMARK_CONSOLE_LOG_FILE`) so it does not corrupt the screen.
+
+### Remote repositories
+
+`STOWMARK_REPOSITORY` also accepts the remote URLs understood by Stowmark, and the credentials are read by Stowmark from its own environment variables:
+
+| Backend | Repository URL | Credentials |
+| --- | --- | --- |
+| SSH/SFTP | `ssh://<user>@<host>[:<port>]/<absolute-path>` | `STOWMARK_SSH_PRIVATE_KEY`, `STOWMARK_SSH_KNOWN_HOSTS` or the SSH agent |
+| S3 | `s3://<bucket>/<path>` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (and `STOWMARK_S3_ENDPOINT`, `STOWMARK_S3_PATH_STYLE` for S3 compatible services) |
+| SMB | `smb://<user>@<host>[:<port>]/<share>[/<path>]` | `STOWMARK_SMB_PASSWORD` |
+| WebDAV | `webdav://` or `webdavs://<host>[:<port>]/<path>` | `STOWMARK_WEBDAV_USERNAME`, `STOWMARK_WEBDAV_PASSWORD` |
+| GCS | `gcs://<bucket>/<path>` | `GOOGLE_APPLICATION_CREDENTIALS` (and `STOWMARK_GCS_ENDPOINT` for emulators) |
+
+See the [Stowmark documentation](https://github.com/bruli-lab/stowmark) for every option. Snapshot sources and restore destinations are always local directories.
 
 ### Configuration
 
@@ -159,6 +172,26 @@ The project uses [Task](https://taskfile.dev/). Run `task` to list every task.
 | `task lint` | Run golangci-lint |
 | `task security` | Run govulncheck |
 | `task check` | Run fmt, fix, security, lint and test in order |
+
+### Local remote backends
+
+`docker/compose.yaml` starts one server per remote backend, bound to `127.0.0.1` on ports that do not clash with the Stowmark project's own test servers:
+
+| Backend | Port | Environment file |
+| --- | --- | --- |
+| SSH/SFTP (OpenSSH) | 12222 | `docker/env/ssh.env` |
+| S3 (moto) | 15000 | `docker/env/s3.env` |
+| SMB (Samba) | 11445 | `docker/env/smb.env` |
+| WebDAV | 18081 | `docker/env/webdav.env` |
+| GCS (fake-gcs-server) | 14443 | `docker/env/gcs.env` |
+
+| Task | Description |
+| --- | --- |
+| `task env:up` | Start the backends, create the buckets and the SSH key and `known_hosts` in `docker/.local/` |
+| `task env:down` | Stop the backends keeping their data |
+| `task env:clean` | Stop the backends and delete their data and keys |
+| `task run:remote BACKEND=ssh` | Start the console against one backend (`ssh`, `s3`, `smb`, `webdav` or `gcs`) |
+| `task test:integration` | Run the store integration tests against every backend (build tag `integration`) |
 
 Build a local snapshot release with [GoReleaser](https://goreleaser.com/):
 

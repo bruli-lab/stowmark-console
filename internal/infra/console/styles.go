@@ -69,6 +69,11 @@ var (
 			Background(colorSurface).
 			Padding(0, 1)
 
+	kindStyle = lipgloss.NewStyle().
+			Foreground(colorText).
+			Background(colorSelected).
+			Padding(0, 1)
+
 	mutedStyle = lipgloss.NewStyle().
 			Foreground(colorMuted)
 

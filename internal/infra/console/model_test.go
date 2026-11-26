@@ -469,3 +469,26 @@ func TestTruncate(t *testing.T) {
 		require.Equal(t, "àèé…", truncated)
 	})
 }
+
+func TestRepositoryKind(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]string{
+		"/home/user/backups":                    "local",
+		"relative/backups":                      "local",
+		"ssh://stowmark@localhost:12222/backup": "ssh",
+		"S3://bucket/backups":                   "s3",
+		"webdavs://dav.example.com/backups":     "webdavs",
+		"gcs://bucket/backups":                  "gcs",
+	}
+
+	for repositoryPath, expected := range tests {
+		t.Run(`Given the repository "`+repositoryPath+`"
+		When its kind is shown
+		Then it is "`+expected+`"`, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, expected, repositoryKind(repositoryPath))
+		})
+	}
+}

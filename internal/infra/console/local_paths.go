@@ -55,3 +55,12 @@ func initRepositoryWarning(repositoryPath string) string {
 
 	return ""
 }
+
+func repositoryKind(repositoryPath string) string {
+	scheme, _, found := strings.Cut(repositoryPath, "://")
+	if !found || scheme == "" {
+		return "local"
+	}
+
+	return strings.ToLower(scheme)
+}

@@ -30,3 +30,4 @@ go.work.sum
 docs/
 sandbox/
 bin/
+docker/.local/

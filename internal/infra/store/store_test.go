@@ -22,10 +22,14 @@ func writeSource(t *testing.T) string {
 func TestStoreWithLocalRepository(t *testing.T) {
 	t.Setenv("STOWMARK_LOG_LEVEL", "error")
 
-	repositoryPath := filepath.Join(t.TempDir(), "repository")
+	exerciseRepository(t, filepath.Join(t.TempDir(), "repository"))
+}
+
+func exerciseRepository(t *testing.T, repositoryURL string) {
+	t.Helper()
 	source := writeSource(t)
 
-	session, err := store.Open(t.Context(), repositoryPath, nil)
+	session, err := store.Open(t.Context(), repositoryURL, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, session.Close()) })
 

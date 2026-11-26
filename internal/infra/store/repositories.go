@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"strings"
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
@@ -24,7 +26,7 @@ func (r *Repositories) Initialized(ctx context.Context) (bool, error) {
 	switch {
 	case err == nil:
 		return true, nil
-	case strings.Contains(err.Error(), configNotFoundMessage):
+	case isConfigNotFound(err):
 		return false, nil
 	default:
 		return false, err
@@ -39,4 +41,8 @@ func (r *Repositories) Initialize(ctx context.Context, options repository.InitOp
 		},
 		PublicKey: options.PublicKey(),
 	})
+}
+
+func isConfigNotFound(err error) bool {
+	return errors.Is(err, fs.ErrNotExist) || strings.Contains(err.Error(), configNotFoundMessage)
 }
