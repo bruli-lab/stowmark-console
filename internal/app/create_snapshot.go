@@ -32,14 +32,19 @@ func (h CreateSnapshot) Handle(ctx context.Context, command cqs.Command) ([]even
 		return nil, cqs.NewInvalidCommandError(CreateSnapshotCommandName, command.Name())
 	}
 
-	if cmd.Source == "" {
-		return nil, snapshot.ErrSourceRequired
-	}
-
-	created, err := h.snapshots.Create(ctx, cmd.Source)
+	creation, err := snapshot.NewCreation(cmd.Source)
 	if err != nil {
 		return nil, err
 	}
 
-	return []event.Event{snapshot.NewCreated(created)}, nil
+	created, err := h.snapshots.Create(ctx, creation)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := creation.Created(created); err != nil {
+		return nil, err
+	}
+
+	return creation.Events(), nil
 }

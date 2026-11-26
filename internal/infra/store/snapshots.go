@@ -62,13 +62,13 @@ func (s *Snapshots) Manifest(ctx context.Context, snapshotID string) (snapshot.M
 	return snapshot.NewManifest(manifest.ID, manifest.Source, files), nil
 }
 
-func (s *Snapshots) Create(ctx context.Context, source string) (snapshot.Snapshot, error) {
+func (s *Snapshots) Create(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, error) {
 	handler, err := s.session.current()
 	if err != nil {
 		return snapshot.Snapshot{}, err
 	}
 
-	result, err := handler.CreateSnapshot(ctx, source, nil)
+	result, err := handler.CreateSnapshot(ctx, creation.Source(), nil)
 	if err != nil {
 		return snapshot.Snapshot{}, err
 	}
@@ -86,13 +86,13 @@ func (s *Snapshots) Create(ctx context.Context, source string) (snapshot.Snapsho
 	return snapshot.New(result.ID, manifest.CreatedAt, len(manifest.Files), totalSize, manifest.Source), nil
 }
 
-func (s *Snapshots) Verify(ctx context.Context, snapshotID string) ([]snapshot.Failure, error) {
+func (s *Snapshots) Verify(ctx context.Context, verification *snapshot.Verification) ([]snapshot.Failure, error) {
 	handler, err := s.session.current()
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := handler.VerifySnapshot(ctx, snapshotID, nil)
+	result, err := handler.VerifySnapshot(ctx, verification.SnapshotID(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -100,13 +100,15 @@ func (s *Snapshots) Verify(ctx context.Context, snapshotID string) ([]snapshot.F
 	return failures(result), nil
 }
 
-func (s *Snapshots) Restore(ctx context.Context, snapshotID, destination string) ([]snapshot.Failure, error) {
+func (s *Snapshots) Restore(ctx context.Context, restoration *snapshot.Restoration) ([]snapshot.Failure, error) {
 	handler, err := s.session.current()
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := handler.RestoreSnapshot(ctx, snapshotID, &destination, nil)
+	destination := restoration.Destination()
+
+	result, err := handler.RestoreSnapshot(ctx, restoration.SnapshotID(), &destination, nil)
 	if err != nil {
 		return nil, err
 	}

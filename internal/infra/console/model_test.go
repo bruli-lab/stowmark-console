@@ -56,10 +56,10 @@ func newHarness(t *testing.T, initialized bool) *harness {
 		FileContentFunc: func(context.Context, string, string, int64) ([]byte, error) {
 			return []byte("line 1\nline 2"), nil
 		},
-		VerifyFunc: func(ctx context.Context, _ string) ([]snapshot.Failure, error) {
+		VerifyFunc: func(ctx context.Context, _ *snapshot.Verification) ([]snapshot.Failure, error) {
 			return nil, ctx.Err()
 		},
-		RestoreFunc: func(context.Context, string, string) ([]snapshot.Failure, error) { return nil, nil },
+		RestoreFunc: func(context.Context, *snapshot.Restoration) ([]snapshot.Failure, error) { return nil, nil },
 		ExtractFileFunc: func(_ context.Context, extraction *snapshot.FileExtraction) (string, error) {
 			return filepath.Join(extraction.Directory(), filepath.Base(extraction.Path())), nil
 		},
@@ -507,7 +507,7 @@ func TestConsoleRestore(t *testing.T) {
 		h.pressAndRun(runes("y"))
 
 		require.Len(t, h.snapshots.RestoreCalls(), 1)
-		require.Equal(t, destination, h.snapshots.RestoreCalls()[0].Destination)
+		require.Equal(t, destination, h.snapshots.RestoreCalls()[0].Restoration.Destination())
 		require.Contains(t, h.model.message, "restored to "+destination)
 	})
 
@@ -516,7 +516,7 @@ func TestConsoleRestore(t *testing.T) {
 	Then the failures are shown as an error`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
-		h.snapshots.RestoreFunc = func(context.Context, string, string) ([]snapshot.Failure, error) {
+		h.snapshots.RestoreFunc = func(context.Context, *snapshot.Restoration) ([]snapshot.Failure, error) {
 			return []snapshot.Failure{{Path: "/data/a.txt", Reason: "permission denied"}}, nil
 		}
 		h.pressAndRun(runes("x"))
@@ -553,7 +553,7 @@ func TestConsoleOperations(t *testing.T) {
 		source := t.TempDir()
 		h := newHarness(t, true).started()
 		created := fixtures.Snapshot().WithID("new-snapshot").Build()
-		h.snapshots.CreateFunc = func(context.Context, string) (snapshot.Snapshot, error) {
+		h.snapshots.CreateFunc = func(context.Context, *snapshot.Creation) (snapshot.Snapshot, error) {
 			return created, nil
 		}
 		h.snapshots.ListFunc = func(context.Context) ([]snapshot.Snapshot, error) {
@@ -565,7 +565,7 @@ func TestConsoleOperations(t *testing.T) {
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.Equal(t, source, h.snapshots.CreateCalls()[0].Source)
+		require.Equal(t, source, h.snapshots.CreateCalls()[0].Creation.Source())
 		require.Contains(t, h.model.message, "Snapshot new-snapshot created")
 		require.Len(t, h.snapshots.ListCalls(), 2)
 		selected, _ := h.model.snapshots.selected()
@@ -608,7 +608,7 @@ func TestConsoleOperations(t *testing.T) {
 
 		h.pressAndRun(runes("v"))
 
-		require.Equal(t, snapshotID, h.snapshots.VerifyCalls()[0].SnapshotID)
+		require.Equal(t, snapshotID, h.snapshots.VerifyCalls()[0].Verification.SnapshotID())
 		require.Contains(t, h.model.message, "verified successfully")
 	})
 }

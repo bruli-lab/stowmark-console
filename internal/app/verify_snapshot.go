@@ -32,14 +32,17 @@ func (h VerifySnapshot) Handle(ctx context.Context, command cqs.Command) ([]even
 		return nil, cqs.NewInvalidCommandError(VerifySnapshotCommandName, command.Name())
 	}
 
-	if cmd.SnapshotID == "" {
-		return nil, snapshot.ErrSnapshotIDRequired
-	}
-
-	failures, err := h.snapshots.Verify(ctx, cmd.SnapshotID)
+	verification, err := snapshot.NewVerification(cmd.SnapshotID)
 	if err != nil {
 		return nil, err
 	}
 
-	return []event.Event{snapshot.NewVerified(cmd.SnapshotID, failures)}, nil
+	failures, err := h.snapshots.Verify(ctx, verification)
+	if err != nil {
+		return nil, err
+	}
+
+	verification.Verified(failures)
+
+	return verification.Events(), nil
 }

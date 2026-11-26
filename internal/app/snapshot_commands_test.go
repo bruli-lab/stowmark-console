@@ -40,7 +40,7 @@ func TestCreateSnapshot(t *testing.T) {
 		t.Parallel()
 		created := fixtures.Snapshot().WithSource("/data").Build()
 		repo := &mocks.SnapshotRepositoryMock{
-			CreateFunc: func(context.Context, string) (snapshot.Snapshot, error) { return created, nil },
+			CreateFunc: func(context.Context, *snapshot.Creation) (snapshot.Snapshot, error) { return created, nil },
 		}
 
 		events, err := app.NewCreateSnapshot(repo).Handle(t.Context(), app.CreateSnapshotCommand{Source: "/data"})
@@ -49,7 +49,7 @@ func TestCreateSnapshot(t *testing.T) {
 		event := singleEvent[snapshot.Created](t, events, snapshot.CreatedEventName)
 		require.Equal(t, created, event.Snapshot)
 		require.Equal(t, created.ID(), event.AggregateRootID())
-		require.Equal(t, "/data", repo.CreateCalls()[0].Source)
+		require.Equal(t, "/data", repo.CreateCalls()[0].Creation.Source())
 	})
 
 	t.Run(`Given a repository that fails
@@ -57,7 +57,9 @@ func TestCreateSnapshot(t *testing.T) {
 	Then the error is returned`, func(t *testing.T) {
 		t.Parallel()
 		repo := &mocks.SnapshotRepositoryMock{
-			CreateFunc: func(context.Context, string) (snapshot.Snapshot, error) { return snapshot.Snapshot{}, errBackend },
+			CreateFunc: func(context.Context, *snapshot.Creation) (snapshot.Snapshot, error) {
+				return snapshot.Snapshot{}, errBackend
+			},
 		}
 
 		_, err := app.NewCreateSnapshot(repo).Handle(t.Context(), app.CreateSnapshotCommand{Source: "/data"})
@@ -94,7 +96,7 @@ func TestVerifySnapshot(t *testing.T) {
 		t.Parallel()
 		failures := []snapshot.Failure{{Path: "/data/a.txt", Reason: "hash mismatch"}}
 		repo := &mocks.SnapshotRepositoryMock{
-			VerifyFunc: func(context.Context, string) ([]snapshot.Failure, error) { return failures, nil },
+			VerifyFunc: func(context.Context, *snapshot.Verification) ([]snapshot.Failure, error) { return failures, nil },
 		}
 
 		events, err := app.NewVerifySnapshot(repo).Handle(t.Context(), app.VerifySnapshotCommand{SnapshotID: "snap"})
@@ -147,7 +149,7 @@ func TestRestoreSnapshot(t *testing.T) {
 	Then the snapshot is restored to the destination and a restored event is returned`, func(t *testing.T) {
 		t.Parallel()
 		repo := &mocks.SnapshotRepositoryMock{
-			RestoreFunc: func(context.Context, string, string) ([]snapshot.Failure, error) { return nil, nil },
+			RestoreFunc: func(context.Context, *snapshot.Restoration) ([]snapshot.Failure, error) { return nil, nil },
 		}
 
 		events, err := app.NewRestoreSnapshot(repo).Handle(t.Context(), app.RestoreSnapshotCommand{SnapshotID: "snap", Destination: "/restore"})
@@ -156,7 +158,7 @@ func TestRestoreSnapshot(t *testing.T) {
 		event := singleEvent[snapshot.Restored](t, events, snapshot.RestoredEventName)
 		require.True(t, event.Succeeded())
 		require.Equal(t, "/restore", event.Destination)
-		require.Equal(t, "/restore", repo.RestoreCalls()[0].Destination)
+		require.Equal(t, "/restore", repo.RestoreCalls()[0].Restoration.Destination())
 	})
 }
 

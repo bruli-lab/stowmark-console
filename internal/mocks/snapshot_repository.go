@@ -19,7 +19,7 @@ var _ snapshot.Repository = &SnapshotRepositoryMock{}
 //
 //		// make and configure a mocked snapshot.Repository
 //		mockedRepository := &SnapshotRepositoryMock{
-//			CreateFunc: func(ctx context.Context, source string) (snapshot.Snapshot, error) {
+//			CreateFunc: func(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, error) {
 //				panic("mock out the Create method")
 //			},
 //			ExtractFileFunc: func(ctx context.Context, extraction *snapshot.FileExtraction) (string, error) {
@@ -34,10 +34,10 @@ var _ snapshot.Repository = &SnapshotRepositoryMock{}
 //			ManifestFunc: func(ctx context.Context, snapshotID string) (snapshot.Manifest, error) {
 //				panic("mock out the Manifest method")
 //			},
-//			RestoreFunc: func(ctx context.Context, snapshotID string, destination string) ([]snapshot.Failure, error) {
+//			RestoreFunc: func(ctx context.Context, restoration *snapshot.Restoration) ([]snapshot.Failure, error) {
 //				panic("mock out the Restore method")
 //			},
-//			VerifyFunc: func(ctx context.Context, snapshotID string) ([]snapshot.Failure, error) {
+//			VerifyFunc: func(ctx context.Context, verification *snapshot.Verification) ([]snapshot.Failure, error) {
 //				panic("mock out the Verify method")
 //			},
 //		}
@@ -48,7 +48,7 @@ var _ snapshot.Repository = &SnapshotRepositoryMock{}
 //	}
 type SnapshotRepositoryMock struct {
 	// CreateFunc mocks the Create method.
-	CreateFunc func(ctx context.Context, source string) (snapshot.Snapshot, error)
+	CreateFunc func(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, error)
 
 	// ExtractFileFunc mocks the ExtractFile method.
 	ExtractFileFunc func(ctx context.Context, extraction *snapshot.FileExtraction) (string, error)
@@ -63,10 +63,10 @@ type SnapshotRepositoryMock struct {
 	ManifestFunc func(ctx context.Context, snapshotID string) (snapshot.Manifest, error)
 
 	// RestoreFunc mocks the Restore method.
-	RestoreFunc func(ctx context.Context, snapshotID string, destination string) ([]snapshot.Failure, error)
+	RestoreFunc func(ctx context.Context, restoration *snapshot.Restoration) ([]snapshot.Failure, error)
 
 	// VerifyFunc mocks the Verify method.
-	VerifyFunc func(ctx context.Context, snapshotID string) ([]snapshot.Failure, error)
+	VerifyFunc func(ctx context.Context, verification *snapshot.Verification) ([]snapshot.Failure, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -74,8 +74,8 @@ type SnapshotRepositoryMock struct {
 		Create []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Source is the source argument value.
-			Source string
+			// Creation is the creation argument value.
+			Creation *snapshot.Creation
 		}
 		// ExtractFile holds details about calls to the ExtractFile method.
 		ExtractFile []struct {
@@ -111,17 +111,15 @@ type SnapshotRepositoryMock struct {
 		Restore []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// SnapshotID is the snapshotID argument value.
-			SnapshotID string
-			// Destination is the destination argument value.
-			Destination string
+			// Restoration is the restoration argument value.
+			Restoration *snapshot.Restoration
 		}
 		// Verify holds details about calls to the Verify method.
 		Verify []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// SnapshotID is the snapshotID argument value.
-			SnapshotID string
+			// Verification is the verification argument value.
+			Verification *snapshot.Verification
 		}
 	}
 	lockCreate      sync.RWMutex
@@ -134,21 +132,21 @@ type SnapshotRepositoryMock struct {
 }
 
 // Create calls CreateFunc.
-func (mock *SnapshotRepositoryMock) Create(ctx context.Context, source string) (snapshot.Snapshot, error) {
+func (mock *SnapshotRepositoryMock) Create(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, error) {
 	if mock.CreateFunc == nil {
 		panic("SnapshotRepositoryMock.CreateFunc: method is nil but Repository.Create was just called")
 	}
 	callInfo := struct {
-		Ctx    context.Context
-		Source string
+		Ctx      context.Context
+		Creation *snapshot.Creation
 	}{
-		Ctx:    ctx,
-		Source: source,
+		Ctx:      ctx,
+		Creation: creation,
 	}
 	mock.lockCreate.Lock()
 	mock.calls.Create = append(mock.calls.Create, callInfo)
 	mock.lockCreate.Unlock()
-	return mock.CreateFunc(ctx, source)
+	return mock.CreateFunc(ctx, creation)
 }
 
 // CreateCalls gets all the calls that were made to Create.
@@ -156,12 +154,12 @@ func (mock *SnapshotRepositoryMock) Create(ctx context.Context, source string) (
 //
 //	len(mockedRepository.CreateCalls())
 func (mock *SnapshotRepositoryMock) CreateCalls() []struct {
-	Ctx    context.Context
-	Source string
+	Ctx      context.Context
+	Creation *snapshot.Creation
 } {
 	var calls []struct {
-		Ctx    context.Context
-		Source string
+		Ctx      context.Context
+		Creation *snapshot.Creation
 	}
 	mock.lockCreate.RLock()
 	calls = mock.calls.Create
@@ -318,23 +316,21 @@ func (mock *SnapshotRepositoryMock) ManifestCalls() []struct {
 }
 
 // Restore calls RestoreFunc.
-func (mock *SnapshotRepositoryMock) Restore(ctx context.Context, snapshotID string, destination string) ([]snapshot.Failure, error) {
+func (mock *SnapshotRepositoryMock) Restore(ctx context.Context, restoration *snapshot.Restoration) ([]snapshot.Failure, error) {
 	if mock.RestoreFunc == nil {
 		panic("SnapshotRepositoryMock.RestoreFunc: method is nil but Repository.Restore was just called")
 	}
 	callInfo := struct {
 		Ctx         context.Context
-		SnapshotID  string
-		Destination string
+		Restoration *snapshot.Restoration
 	}{
 		Ctx:         ctx,
-		SnapshotID:  snapshotID,
-		Destination: destination,
+		Restoration: restoration,
 	}
 	mock.lockRestore.Lock()
 	mock.calls.Restore = append(mock.calls.Restore, callInfo)
 	mock.lockRestore.Unlock()
-	return mock.RestoreFunc(ctx, snapshotID, destination)
+	return mock.RestoreFunc(ctx, restoration)
 }
 
 // RestoreCalls gets all the calls that were made to Restore.
@@ -343,13 +339,11 @@ func (mock *SnapshotRepositoryMock) Restore(ctx context.Context, snapshotID stri
 //	len(mockedRepository.RestoreCalls())
 func (mock *SnapshotRepositoryMock) RestoreCalls() []struct {
 	Ctx         context.Context
-	SnapshotID  string
-	Destination string
+	Restoration *snapshot.Restoration
 } {
 	var calls []struct {
 		Ctx         context.Context
-		SnapshotID  string
-		Destination string
+		Restoration *snapshot.Restoration
 	}
 	mock.lockRestore.RLock()
 	calls = mock.calls.Restore
@@ -358,21 +352,21 @@ func (mock *SnapshotRepositoryMock) RestoreCalls() []struct {
 }
 
 // Verify calls VerifyFunc.
-func (mock *SnapshotRepositoryMock) Verify(ctx context.Context, snapshotID string) ([]snapshot.Failure, error) {
+func (mock *SnapshotRepositoryMock) Verify(ctx context.Context, verification *snapshot.Verification) ([]snapshot.Failure, error) {
 	if mock.VerifyFunc == nil {
 		panic("SnapshotRepositoryMock.VerifyFunc: method is nil but Repository.Verify was just called")
 	}
 	callInfo := struct {
-		Ctx        context.Context
-		SnapshotID string
+		Ctx          context.Context
+		Verification *snapshot.Verification
 	}{
-		Ctx:        ctx,
-		SnapshotID: snapshotID,
+		Ctx:          ctx,
+		Verification: verification,
 	}
 	mock.lockVerify.Lock()
 	mock.calls.Verify = append(mock.calls.Verify, callInfo)
 	mock.lockVerify.Unlock()
-	return mock.VerifyFunc(ctx, snapshotID)
+	return mock.VerifyFunc(ctx, verification)
 }
 
 // VerifyCalls gets all the calls that were made to Verify.
@@ -380,12 +374,12 @@ func (mock *SnapshotRepositoryMock) Verify(ctx context.Context, snapshotID strin
 //
 //	len(mockedRepository.VerifyCalls())
 func (mock *SnapshotRepositoryMock) VerifyCalls() []struct {
-	Ctx        context.Context
-	SnapshotID string
+	Ctx          context.Context
+	Verification *snapshot.Verification
 } {
 	var calls []struct {
-		Ctx        context.Context
-		SnapshotID string
+		Ctx          context.Context
+		Verification *snapshot.Verification
 	}
 	mock.lockVerify.RLock()
 	calls = mock.calls.Verify

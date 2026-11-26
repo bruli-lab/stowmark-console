@@ -33,18 +33,17 @@ func (h RestoreSnapshot) Handle(ctx context.Context, command cqs.Command) ([]eve
 		return nil, cqs.NewInvalidCommandError(RestoreSnapshotCommandName, command.Name())
 	}
 
-	if cmd.SnapshotID == "" {
-		return nil, snapshot.ErrSnapshotIDRequired
-	}
-
-	if err := snapshot.ValidateDestination(cmd.Destination); err != nil {
-		return nil, err
-	}
-
-	failures, err := h.snapshots.Restore(ctx, cmd.SnapshotID, cmd.Destination)
+	restoration, err := snapshot.NewRestoration(cmd.SnapshotID, cmd.Destination)
 	if err != nil {
 		return nil, err
 	}
 
-	return []event.Event{snapshot.NewRestored(cmd.SnapshotID, cmd.Destination, failures)}, nil
+	failures, err := h.snapshots.Restore(ctx, restoration)
+	if err != nil {
+		return nil, err
+	}
+
+	restoration.Restored(failures)
+
+	return restoration.Events(), nil
 }

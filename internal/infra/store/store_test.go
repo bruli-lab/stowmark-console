@@ -65,7 +65,7 @@ func exerciseRepository(t *testing.T, repositoryURL string) {
 	t.Run(`Given an initialized repository
 	When a snapshot of a directory is created
 	Then it is listed with its source, files and size`, func(t *testing.T) {
-		created, err := snapshots.Create(t.Context(), source)
+		created, err := snapshots.Create(t.Context(), creation(t, source))
 		require.NoError(t, err)
 		snapshotID = created.ID()
 
@@ -84,7 +84,7 @@ func exerciseRepository(t *testing.T, repositoryURL string) {
 	t.Run(`Given a source that is already stored
 	When a second snapshot of it is created
 	Then the created snapshot reports every file of the source, not only the new ones`, func(t *testing.T) {
-		created, err := snapshots.Create(t.Context(), source)
+		created, err := snapshots.Create(t.Context(), creation(t, source))
 
 		require.NoError(t, err)
 		require.Equal(t, 2, created.FileCount())
@@ -137,7 +137,7 @@ func exerciseRepository(t *testing.T, repositoryURL string) {
 	t.Run(`Given a snapshot
 	When it is verified
 	Then there are no failures`, func(t *testing.T) {
-		failures, err := snapshots.Verify(t.Context(), snapshotID)
+		failures, err := snapshots.Verify(t.Context(), verification(t, snapshotID))
 
 		require.NoError(t, err)
 		require.Empty(t, failures)
@@ -148,7 +148,7 @@ func exerciseRepository(t *testing.T, repositoryURL string) {
 	Then the files are restored there and the source is untouched`, func(t *testing.T) {
 		destination := filepath.Join(t.TempDir(), "restore")
 
-		failures, err := snapshots.Restore(t.Context(), snapshotID, destination)
+		failures, err := snapshots.Restore(t.Context(), restoration(t, snapshotID, destination))
 
 		require.NoError(t, err)
 		require.Empty(t, failures)
@@ -159,4 +159,31 @@ func exerciseRepository(t *testing.T, repositoryURL string) {
 		require.NoError(t, err)
 		require.Equal(t, "hello stowmark", string(original))
 	})
+}
+
+func creation(t *testing.T, source string) *snapshot.Creation {
+	t.Helper()
+
+	created, err := snapshot.NewCreation(source)
+	require.NoError(t, err)
+
+	return created
+}
+
+func verification(t *testing.T, snapshotID string) *snapshot.Verification {
+	t.Helper()
+
+	verified, err := snapshot.NewVerification(snapshotID)
+	require.NoError(t, err)
+
+	return verified
+}
+
+func restoration(t *testing.T, snapshotID, destination string) *snapshot.Restoration {
+	t.Helper()
+
+	restored, err := snapshot.NewRestoration(snapshotID, destination)
+	require.NoError(t, err)
+
+	return restored
 }
