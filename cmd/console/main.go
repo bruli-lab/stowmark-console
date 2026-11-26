@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"os"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/bruli-lab/stowmark-console/internal/app"
 	"github.com/bruli-lab/stowmark-console/internal/config"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/infra/console"
 	"github.com/bruli-lab/stowmark-console/internal/infra/stderr"
 	"github.com/bruli-lab/stowmark-console/internal/infra/store"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
@@ -62,7 +62,7 @@ func runConsole(conf *config.Config) (err error) {
 		Init:           repository.NewInitOptions(conf.Compression, conf.CompressionLevel, conf.PublicKey),
 	}, handlers)
 
-	if _, err := tea.NewProgram(&model, tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(&model).Run(); err != nil {
 		return fmt.Errorf("running console: %w", err)
 	}
 

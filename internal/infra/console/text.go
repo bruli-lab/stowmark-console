@@ -57,11 +57,6 @@ func truncate(value string, width int) string {
 	return ansi.Truncate(value, max(0, width), "…")
 }
 
-func padRight(value string, width int) string {
-	value = truncate(value, width)
-	return value + strings.Repeat(" ", max(0, width-ansi.StringWidth(value)))
-}
-
 func padLeft(value string, width int) string {
 	value = truncate(value, width)
 	return strings.Repeat(" ", max(0, width-ansi.StringWidth(value))) + value

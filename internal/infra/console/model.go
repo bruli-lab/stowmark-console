@@ -2,165 +2,149 @@ package console
 
 import (
 	"context"
-	"path/filepath"
-	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/bruli-lab/stowmark-console/internal/app"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
-)
-
-type view int
-
-const (
-	snapshotsView view = iota
-	filesView
 )
 
 type Model struct {
 	ctx             context.Context
 	handlers        app.Handlers
 	settings        Settings
-	view            view
-	snapshots       []snapshot.Snapshot
-	snapshotCursor  int
-	manifest        snapshot.Manifest
-	directory       string
-	entries         []snapshot.Entry
-	fileCursor      int
-	preview         *filePreview
 	width           int
 	height          int
+	snapshots       *snapshotsScreen
+	screens         []screen
+	dialog          dialog
+	command         *commandLine
 	loading         bool
+	progress        string
 	cancelOperation context.CancelFunc
-	err             error
-	commandMode     bool
-	commandInput    string
 	message         string
-	preserveMessage bool
-	confirmingInit  bool
-	initWarning     string
-	snapshotForm    *textPrompt
-	restoreForm     *textPrompt
-	restore         *restoreRequest
-}
-
-type filePreview struct {
-	name      string
-	lines     []string
-	offset    int
-	truncated bool
-}
-
-type restoreRequest struct {
-	snapshotID  string
-	destination string
-	warning     string
+	err             error
 }
 
 func New(ctx context.Context, settings Settings, handlers app.Handlers) Model {
 	return Model{
-		ctx:      ctx,
-		handlers: handlers,
-		settings: settings,
-		loading:  true,
+		ctx:       ctx,
+		handlers:  handlers,
+		settings:  settings,
+		snapshots: newSnapshotsScreen(),
+		loading:   true,
 	}
 }
 
-func (m *Model) confirmingRestore() bool {
-	return m.restore != nil && m.restoreForm == nil
+func (m *Model) Init() tea.Cmd {
+	return m.checkRepository()
 }
 
-func (m *Model) selectedSnapshot() (snapshot.Snapshot, bool) {
-	if m.snapshotCursor < 0 || m.snapshotCursor >= len(m.snapshots) {
-		return snapshot.Snapshot{}, false
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		m.resizeScreens()
+		return m, nil
+
+	case tea.KeyPressMsg:
+		cmd := m.handleKey(msg)
+		return m, cmd
+
+	case tea.PasteMsg:
+		cmd := m.handleInput(msg)
+		return m, cmd
 	}
 
-	return m.snapshots[m.snapshotCursor], true
-}
-
-func (m *Model) currentSnapshotID() (string, bool) {
-	if m.view == filesView {
-		return m.manifest.SnapshotID(), m.manifest.SnapshotID() != ""
+	if cmd, handled := m.handleIntent(msg); handled {
+		return m, cmd
 	}
 
-	selected, ok := m.selectedSnapshot()
+	cmd := m.handleResult(msg)
 
-	return selected.ID(), ok
+	return m, cmd
 }
 
-func (m *Model) selectedEntry() (snapshot.Entry, bool) {
-	if m.fileCursor < 0 || m.fileCursor >= len(m.entries) {
-		return snapshot.Entry{}, false
+func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
+	switch {
+	case m.dialog != nil || m.command != nil:
+		return m.handleInput(msg)
+	case msg.String() == "ctrl+c":
+		return tea.Quit
+	case m.loading:
+		m.handleLoadingKey(msg)
+		return nil
+	case msg.String() == ":":
+		m.command = newCommandLine()
+		return nil
 	}
 
-	return m.entries[m.fileCursor], true
+	m.err = nil
+	m.message = ""
+
+	return m.top().update(msg)
 }
 
-func (m *Model) showDirectory(directory, selectName string) {
-	m.directory = directory
-	m.entries = m.manifest.Entries(directory)
-	m.fileCursor = 0
-
-	for index, entry := range m.entries {
-		if entry.Name() == selectName {
-			m.fileCursor = index
-			return
+func (m *Model) handleInput(msg tea.Msg) tea.Cmd {
+	switch {
+	case m.dialog != nil:
+		closed, cmd := m.dialog.update(msg)
+		if closed {
+			m.dialog = nil
 		}
+		return cmd
+
+	case m.command != nil:
+		closed, cmd := m.command.update(msg)
+		if closed {
+			m.command = nil
+		}
+		return cmd
+	}
+
+	return nil
+}
+
+func (m *Model) handleLoadingKey(msg tea.KeyPressMsg) {
+	if msg.String() == "esc" && m.cancelOperation != nil {
+		m.cancelOperation()
+		m.progress = "Cancelling..."
 	}
 }
 
-func (m *Model) enterSelectedEntry() {
-	entry, ok := m.selectedEntry()
-	if !ok || !entry.IsDir() {
+func (m *Model) top() screen {
+	if len(m.screens) == 0 {
+		return m.snapshots
+	}
+
+	return m.screens[len(m.screens)-1]
+}
+
+func (m *Model) push(next screen) {
+	m.screens = append(m.screens, next)
+	m.resizeScreens()
+}
+
+func (m *Model) pop() {
+	if len(m.screens) > 0 {
+		m.screens = m.screens[:len(m.screens)-1]
+	}
+}
+
+func (m *Model) showManifest(manifest snapshot.Manifest) {
+	if files, ok := m.top().(*filesScreen); ok && files.snapshotID() == manifest.SnapshotID() {
+		files.setManifest(manifest)
 		return
 	}
 
-	m.showDirectory(filepath.Join(m.directory, entry.Name()), "")
+	m.push(newFilesScreen(manifest))
 }
 
-func (m *Model) leaveDirectory() {
-	if m.directory == "" {
-		m.view = snapshotsView
-		m.manifest = snapshot.Manifest{}
-		m.entries = nil
-		return
+func (m *Model) resizeScreens() {
+	width, height := m.contentSize()
+
+	m.snapshots.resize(width, height)
+	for _, item := range m.screens {
+		item.resize(width, height)
 	}
-
-	m.showDirectory(snapshot.ParentDirectory(m.directory), filepath.Base(m.directory))
-}
-
-func (m *Model) selectSnapshot(snapshotID string) {
-	for index, item := range m.snapshots {
-		if item.ID() == snapshotID {
-			m.snapshotCursor = index
-			return
-		}
-	}
-
-	m.snapshotCursor = min(m.snapshotCursor, max(0, len(m.snapshots)-1))
-}
-
-func (m *Model) openPreview(name string, content []byte, truncated bool) {
-	text := strings.TrimSuffix(strings.ToValidUTF8(string(content), ""), "\n")
-	m.preview = &filePreview{
-		name:      name,
-		lines:     strings.Split(strings.ReplaceAll(text, "\t", "    "), "\n"),
-		truncated: truncated,
-	}
-}
-
-func (m *Model) contentHeight() int {
-	return max(1, m.height-2-contentStyle.GetVerticalFrameSize())
-}
-
-func (m *Model) previewVisibleLines() int {
-	return max(1, m.contentHeight()-2)
-}
-
-func (m *Model) maxPreviewOffset() int {
-	if m.preview == nil {
-		return 0
-	}
-
-	return max(0, len(m.preview.lines)-m.previewVisibleLines())
 }

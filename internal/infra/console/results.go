@@ -5,112 +5,100 @@ import (
 	"errors"
 	"fmt"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
-func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := message.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-
-	case tea.KeyMsg:
-		return m.handleKey(msg)
-
+func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
 	case repositoryStatusMsg:
 		m.finishOperation()
 		if m.fail("open repository", msg.err) {
-			return m, nil
+			return nil
 		}
 		if !msg.initialized {
-			m.message = ""
-			m.confirmingInit = true
-			m.initWarning = initRepositoryWarning(m.settings.RepositoryPath)
-			return m, nil
+			m.openInitConfirmation()
+			return nil
 		}
-		cmd := m.loadSnapshots("")
-		return m, cmd
+		return m.loadSnapshots("")
 
 	case repositoryInitializedMsg:
 		m.finishOperation()
 		if m.fail("initialize repository", msg.err) {
-			return m, nil
+			return nil
 		}
-		cmd := m.reloadWithMessage("Repository initialized successfully", "")
-		return m, cmd
+		m.message = "Repository initialized successfully"
+		return m.loadSnapshots("")
 
 	case snapshotsLoadedMsg:
 		m.finishOperation()
-		m.consumeMessage()
 		if m.fail("load snapshots", msg.err) {
-			return m, nil
+			return nil
 		}
-		m.snapshots = msg.snapshots
-		m.selectSnapshot(msg.selectID)
+		m.snapshots.setSnapshots(msg.snapshots, msg.selectID)
 
 	case manifestLoadedMsg:
 		m.finishOperation()
-		m.consumeMessage()
 		if m.fail("load snapshot", msg.err) {
-			return m, nil
+			return nil
 		}
-		m.manifest = msg.manifest
-		m.view = filesView
-		m.showDirectory("", "")
+		m.showManifest(msg.manifest)
 
 	case fileContentLoadedMsg:
-		m.finishOperation()
-		m.message = ""
-		if m.fail("read "+msg.name, msg.err) {
-			return m, nil
-		}
-		if !isText(msg.content) {
-			m.err = fmt.Errorf("%q is not a text file", msg.name)
-			return m, nil
-		}
-		m.openPreview(msg.name, msg.content, msg.truncated)
+		m.handleFileContent(&msg)
 
 	case snapshotCreatedMsg:
 		m.finishOperation()
 		if m.fail("create snapshot", msg.err) {
-			return m, nil
+			return nil
 		}
 		created := msg.event.Snapshot
-		m.view = snapshotsView
-		message := fmt.Sprintf(
+		m.screens = nil
+		m.message = fmt.Sprintf(
 			"Snapshot %s created: %d files, %s",
 			created.ID(),
 			created.FileCount(),
 			formatSize(created.TotalSize()),
 		)
-		cmd := m.reloadWithMessage(message, created.ID())
-		return m, cmd
+		return m.loadSnapshots(created.ID())
 
 	case snapshotVerifiedMsg:
 		m.finishOperation()
 		if m.fail("verify snapshot "+msg.snapshotID, msg.err) {
-			return m, nil
+			return nil
 		}
 		if !msg.event.Succeeded() {
 			m.err = fmt.Errorf("snapshot %s is corrupted: %w", msg.snapshotID, failuresError(msg.event.Failures))
-			return m, nil
+			return nil
 		}
 		m.message = fmt.Sprintf("Snapshot %s verified successfully", msg.snapshotID)
 
 	case snapshotRestoredMsg:
 		m.finishOperation()
 		if m.fail("restore snapshot "+msg.snapshotID, msg.err) {
-			return m, nil
+			return nil
 		}
 		if !msg.event.Succeeded() {
 			m.err = fmt.Errorf("snapshot %s restored with errors: %w", msg.snapshotID, failuresError(msg.event.Failures))
-			return m, nil
+			return nil
 		}
 		m.message = fmt.Sprintf("Snapshot %s restored to %s", msg.snapshotID, msg.event.Destination)
 	}
 
-	return m, nil
+	return nil
+}
+
+func (m *Model) handleFileContent(msg *fileContentLoadedMsg) {
+	m.finishOperation()
+	if m.fail("read "+msg.request.name, msg.err) {
+		return
+	}
+	if !isText(msg.content) {
+		m.err = fmt.Errorf("%q is not a text file", msg.request.name)
+		return
+	}
+
+	m.push(newPreviewScreen(msg.request.location, msg.request.name, msg.content, msg.truncated))
 }
 
 func (m *Model) fail(action string, err error) bool {
@@ -128,21 +116,6 @@ func (m *Model) fail(action string, err error) bool {
 	m.message = ""
 
 	return true
-}
-
-func (m *Model) reloadWithMessage(message, selectID string) tea.Cmd {
-	cmd := m.loadSnapshots(selectID)
-	m.message = message
-	m.preserveMessage = true
-
-	return cmd
-}
-
-func (m *Model) consumeMessage() {
-	if !m.preserveMessage {
-		m.message = ""
-	}
-	m.preserveMessage = false
 }
 
 func failuresError(failures []snapshot.Failure) error {

@@ -110,13 +110,15 @@ The initialization options only apply when the console creates a new repository,
 | Key | Action |
 | --- | --- |
 | `↑` / `k`, `↓` / `j` | Select the previous or next snapshot |
+| `PgUp` / `b`, `PgDown` / `f`, `u` / `d` | Move one page or half a page |
 | `g` / `Home`, `G` / `End` | Select the first or last snapshot |
 | `Enter` / `→` / `l` | Browse the files of the selected snapshot |
 | `c` | Create a snapshot |
 | `v` | Verify the selected snapshot |
 | `x` | Restore the selected snapshot |
 | `r` | Refresh the list |
-| `:q` / `Ctrl+C` | Exit |
+| `:` | Open the command line |
+| `Ctrl+C` | Exit |
 
 ### Files of a snapshot
 
@@ -134,11 +136,21 @@ The initialization options only apply when the console creates a new repository,
 | Key | Action |
 | --- | --- |
 | `↑` / `k`, `↓` / `j` | Scroll one line |
-| `PgUp`, `PgDown` / `Space` | Scroll one page |
+| `←` / `h`, `→` / `l` | Scroll long lines horizontally |
+| `PgUp` / `b`, `PgDown` / `f` / `Space` | Scroll one page |
 | `g` / `Home`, `G` / `End` | Go to the top or the bottom |
 | `Esc` / `q` | Close the preview |
 
 Previews read at most the first 1 MiB of a file from the snapshot.
+
+### Command line
+
+Press `:` in any view, type a command and press `Enter`. `Esc` closes the command line.
+
+| Command | Action |
+| --- | --- |
+| `:q`, `:quit` | Exit |
+| `:snap`, `:snapshots`, `:s` | Go back to the snapshots list |
 
 ### Creating and restoring
 
@@ -155,7 +167,7 @@ The project follows a hexagonal architecture:
 - `internal/domain`: entities, value objects, events and ports (`repository`, `snapshot`).
 - `internal/app`: one query or command handler per use case (CQS). Commands return domain events.
 - `internal/infra/store`: adapter that implements the ports on top of the Stowmark library, with a single handler per session.
-- `internal/infra/console`: the terminal user interface, which only talks to the application layer.
+- `internal/infra/console`: the terminal user interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) v2, which only talks to the application layer. A root model keeps a stack of screens (snapshots, files, preview) and the active dialog; screens emit intent messages and the root model runs the use cases.
 - `internal/config`, `internal/fixtures`, `internal/mocks`: configuration, test data builders and moq mocks.
 
 ## Development

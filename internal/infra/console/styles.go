@@ -1,6 +1,6 @@
 package console
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 const sidebarContentWidth = 24
 
@@ -56,10 +56,6 @@ var (
 			Bold(true).
 			Foreground(colorSecondary)
 
-	selectedRowStyle = lipgloss.NewStyle().
-				Background(colorSelected).
-				Foreground(colorText)
-
 	errorStyle = lipgloss.NewStyle().
 			Foreground(colorError).
 			Bold(true)
@@ -73,6 +69,28 @@ var (
 			Foreground(colorText).
 			Background(colorSelected).
 			Padding(0, 1)
+
+	errorBlockStyle = lipgloss.NewStyle().
+			Foreground(colorError).
+			Background(colorSurface).
+			Bold(true).
+			Padding(0, 1)
+
+	tableHeaderStyle = lipgloss.NewStyle().
+				Foreground(colorMuted).
+				Bold(true).
+				Padding(0, 1).
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderBottom(true).
+				BorderForeground(colorSelected)
+
+	tableCellStyle = lipgloss.NewStyle().
+			Padding(0, 1)
+
+	tableSelectedStyle = lipgloss.NewStyle().
+				Background(colorSelected).
+				Foreground(colorText).
+				Bold(true)
 
 	mutedStyle = lipgloss.NewStyle().
 			Foreground(colorMuted)

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var errDestinationRequired = errors.New("destination is required")
+var errPathRequired = errors.New("a path is required")
 
 func defaultRestoreDestination(snapshotID string) string {
 	base, err := os.UserHomeDir()
@@ -21,7 +21,7 @@ func defaultRestoreDestination(snapshotID string) string {
 
 func resolveLocalPath(raw string) (string, error) {
 	if raw == "" {
-		return "", errDestinationRequired
+		return "", errPathRequired
 	}
 
 	if raw == "~" || strings.HasPrefix(raw, "~/") {

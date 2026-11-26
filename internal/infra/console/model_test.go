@@ -6,13 +6,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"unicode/utf8"
 
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/bruli-lab/stowmark-console/internal/app"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/fixtures"
 	"github.com/bruli-lab/stowmark-console/internal/mocks"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,13 +67,19 @@ func (h *harness) run(cmd tea.Cmd) {
 	}
 }
 
-func (h *harness) press(msg tea.KeyMsg) tea.Cmd {
+func (h *harness) press(msg tea.KeyPressMsg) tea.Cmd {
 	_, cmd := h.model.Update(msg)
 	return cmd
 }
 
-func (h *harness) pressAndRun(msg tea.KeyMsg) {
+func (h *harness) pressAndRun(msg tea.KeyPressMsg) {
 	h.run(h.press(msg))
+}
+
+func (h *harness) typeText(value string) {
+	for _, char := range value {
+		h.pressAndRun(runes(string(char)))
+	}
 }
 
 func (h *harness) started() *harness {
@@ -78,12 +87,43 @@ func (h *harness) started() *harness {
 	return h
 }
 
-func runes(value string) tea.KeyMsg {
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(value)}
+func (h *harness) view() string {
+	return h.model.View().Content
 }
 
-func key(keyType tea.KeyType) tea.KeyMsg {
-	return tea.KeyMsg{Type: keyType}
+func (h *harness) files() *filesScreen {
+	files, _ := h.model.top().(*filesScreen)
+	return files
+}
+
+func (h *harness) preview() *previewScreen {
+	preview, _ := h.model.top().(*previewScreen)
+	return preview
+}
+
+func (h *harness) prompt() *promptDialog {
+	prompt, _ := h.model.dialog.(*promptDialog)
+	return prompt
+}
+
+func (h *harness) confirmation() *confirmDialog {
+	confirmation, _ := h.model.dialog.(*confirmDialog)
+	return confirmation
+}
+
+func (h *harness) start(msg tea.KeyPressMsg) tea.Cmd {
+	intent := h.press(msg)
+	_, operation := h.model.Update(intent())
+	return operation
+}
+
+func runes(value string) tea.KeyPressMsg {
+	code, _ := utf8.DecodeRuneInString(value)
+	return tea.KeyPressMsg{Code: code, Text: value}
+}
+
+func key(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: code}
 }
 
 func isQuit(cmd tea.Cmd) bool {
@@ -103,8 +143,8 @@ func TestConsoleStartup(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
 
-		require.True(t, h.model.confirmingInit)
-		require.Contains(t, h.model.View(), "zstd")
+		require.NotNil(t, h.confirmation())
+		require.Contains(t, h.view(), "zstd")
 		require.Empty(t, h.repositories.InitializeCalls())
 	})
 
@@ -128,7 +168,7 @@ func TestConsoleStartup(t *testing.T) {
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.True(t, h.model.confirmingInit)
+		require.NotNil(t, h.confirmation())
 		require.Empty(t, h.repositories.InitializeCalls())
 	})
 
@@ -152,9 +192,9 @@ func TestConsoleStartup(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
 
-		require.False(t, h.model.confirmingInit)
-		require.Len(t, h.model.snapshots, 1)
-		require.Contains(t, h.model.View(), snapshotID)
+		require.Nil(t, h.model.dialog)
+		require.Len(t, h.model.snapshots.snapshots, 1)
+		require.Contains(t, h.view(), snapshotID)
 	})
 
 	t.Run(`Given a repository that cannot be opened
@@ -182,10 +222,10 @@ func TestConsoleBrowsing(t *testing.T) {
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.Equal(t, filesView, h.model.view)
+		require.NotNil(t, h.files())
 		require.Equal(t, snapshotID, h.snapshots.ManifestCalls()[0].SnapshotID)
-		require.Equal(t, "notes", h.model.entries[0].Name())
-		require.Equal(t, "README.txt", h.model.entries[1].Name())
+		require.Equal(t, "notes", h.files().entries[0].Name())
+		require.Equal(t, "README.txt", h.files().entries[1].Name())
 	})
 
 	t.Run(`Given a nested directory of a snapshot
@@ -195,16 +235,17 @@ func TestConsoleBrowsing(t *testing.T) {
 		h := newHarness(t, true).started()
 		h.pressAndRun(key(tea.KeyEnter))
 		h.pressAndRun(key(tea.KeyEnter))
-		require.Equal(t, "notes", h.model.directory)
+		require.Equal(t, "notes", h.files().directory)
 
 		h.pressAndRun(key(tea.KeyEsc))
 
-		require.Equal(t, "", h.model.directory)
-		require.Equal(t, "notes", h.model.entries[h.model.fileCursor].Name())
+		require.Equal(t, "", h.files().directory)
+		selected, _ := h.files().selected()
+		require.Equal(t, "notes", selected.Name())
 
 		h.pressAndRun(key(tea.KeyEsc))
 
-		require.Equal(t, snapshotsView, h.model.view)
+		require.Equal(t, h.model.snapshots, h.model.top())
 	})
 
 	t.Run(`Given a text file of a snapshot
@@ -217,8 +258,9 @@ func TestConsoleBrowsing(t *testing.T) {
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.NotNil(t, h.model.preview)
-		require.Equal(t, []string{"line 1", "line 2"}, h.model.preview.lines)
+		require.NotNil(t, h.preview())
+		require.Equal(t, "line 1\nline 2", h.preview().viewport.GetContent())
+		require.Equal(t, snapshotID+"/README.txt", h.model.top().location())
 		call := h.snapshots.FileContentCalls()[0]
 		require.Equal(t, "/home/user/documents/README.txt", call.Path)
 		require.Equal(t, int64(maxPreviewSize), call.MaxSize)
@@ -237,7 +279,7 @@ func TestConsoleBrowsing(t *testing.T) {
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.Nil(t, h.model.preview)
+		require.Nil(t, h.preview())
 		require.ErrorContains(t, h.model.err, "not a text file")
 	})
 }
@@ -253,9 +295,9 @@ func TestConsoleRestore(t *testing.T) {
 
 		h.pressAndRun(runes("x"))
 
-		require.NotNil(t, h.model.restoreForm)
-		require.True(t, filepath.IsAbs(h.model.restoreForm.value))
-		require.Equal(t, snapshotID, filepath.Base(h.model.restoreForm.value))
+		require.NotNil(t, h.prompt())
+		require.True(t, filepath.IsAbs(h.prompt().input.Value()))
+		require.Equal(t, snapshotID, filepath.Base(h.prompt().input.Value()))
 	})
 
 	t.Run(`Given the destination form with an empty destination
@@ -264,12 +306,12 @@ func TestConsoleRestore(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
 		h.pressAndRun(runes("x"))
-		h.model.restoreForm.value = "  "
+		h.prompt().input.SetValue("  ")
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.NotEmpty(t, h.model.restoreForm.err)
-		require.False(t, h.model.confirmingRestore())
+		require.NotEmpty(t, h.prompt().err)
+		require.Nil(t, h.confirmation())
 	})
 
 	t.Run(`Given the destination form with a non empty directory
@@ -280,13 +322,13 @@ func TestConsoleRestore(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(destination, "file.txt"), []byte("data"), 0o600))
 		h := newHarness(t, true).started()
 		h.pressAndRun(runes("x"))
-		h.model.restoreForm.value = destination
+		h.prompt().input.SetValue(destination)
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.True(t, h.model.confirmingRestore())
-		require.Equal(t, destination, h.model.restore.destination)
-		require.NotEmpty(t, h.model.restore.warning)
+		require.NotNil(t, h.confirmation())
+		require.Contains(t, h.confirmation().body, destination)
+		require.NotEmpty(t, h.confirmation().warning)
 	})
 
 	t.Run(`Given the restore confirmation
@@ -299,7 +341,7 @@ func TestConsoleRestore(t *testing.T) {
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.True(t, h.model.confirmingRestore())
+		require.NotNil(t, h.confirmation())
 		require.Empty(t, h.snapshots.RestoreCalls())
 	})
 
@@ -310,7 +352,7 @@ func TestConsoleRestore(t *testing.T) {
 		destination := filepath.Join(t.TempDir(), "restore")
 		h := newHarness(t, true).started()
 		h.pressAndRun(runes("x"))
-		h.model.restoreForm.value = destination
+		h.prompt().input.SetValue(destination)
 		h.pressAndRun(key(tea.KeyEnter))
 
 		h.pressAndRun(runes("y"))
@@ -346,7 +388,7 @@ func TestConsoleRestore(t *testing.T) {
 
 		h.pressAndRun(runes("n"))
 
-		require.Nil(t, h.model.restore)
+		require.Nil(t, h.model.dialog)
 		require.Empty(t, h.snapshots.RestoreCalls())
 		require.Equal(t, "Restore cancelled", h.model.message)
 	})
@@ -361,17 +403,23 @@ func TestConsoleOperations(t *testing.T) {
 		t.Parallel()
 		source := t.TempDir()
 		h := newHarness(t, true).started()
+		created := fixtures.Snapshot().WithID("new-snapshot").Build()
 		h.snapshots.CreateFunc = func(context.Context, string) (snapshot.Snapshot, error) {
-			return fixtures.Snapshot().WithID("new-snapshot").Build(), nil
+			return created, nil
+		}
+		h.snapshots.ListFunc = func(context.Context) ([]snapshot.Snapshot, error) {
+			return []snapshot.Snapshot{fixtures.Snapshot().WithID(snapshotID).Build(), created}, nil
 		}
 		h.pressAndRun(runes("c"))
-		h.model.snapshotForm.value = source
+		h.typeText(source)
 
 		h.pressAndRun(key(tea.KeyEnter))
 
 		require.Equal(t, source, h.snapshots.CreateCalls()[0].Source)
 		require.Contains(t, h.model.message, "Snapshot new-snapshot created")
 		require.Len(t, h.snapshots.ListCalls(), 2)
+		selected, _ := h.model.snapshots.selected()
+		require.Equal(t, "new-snapshot", selected.ID())
 	})
 
 	t.Run(`Given an operation in progress
@@ -379,12 +427,12 @@ func TestConsoleOperations(t *testing.T) {
 	Then the action is ignored`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
-		h.press(runes("v"))
+		h.start(runes("v"))
 
-		h.press(runes("x"))
+		h.pressAndRun(runes("x"))
 
 		require.True(t, h.model.loading)
-		require.Nil(t, h.model.restoreForm)
+		require.Nil(t, h.model.dialog)
 	})
 
 	t.Run(`Given a verification in progress
@@ -392,10 +440,10 @@ func TestConsoleOperations(t *testing.T) {
 	Then the operation is cancelled`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
-		cmd := h.press(runes("v"))
+		operation := h.start(runes("v"))
 
 		h.press(key(tea.KeyEsc))
-		h.run(cmd)
+		h.run(operation)
 
 		require.False(t, h.model.loading)
 		require.NoError(t, h.model.err)
@@ -415,20 +463,120 @@ func TestConsoleOperations(t *testing.T) {
 	})
 }
 
-func TestTextPrompt(t *testing.T) {
+func TestConsoleDialogsAndCommands(t *testing.T) {
 	t.Parallel()
 
-	t.Run(`Given an empty prompt
+	t.Run(`Given the create form
 	When the user types a path with spaces
 	Then the spaces are kept`, func(t *testing.T) {
 		t.Parallel()
-		prompt := newTextPrompt("title", "label", "")
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes("c"))
 
-		prompt.handleKey(runes("my"))
-		prompt.handleKey(key(tea.KeySpace))
-		prompt.handleKey(runes("dir"))
+		h.typeText("my")
+		h.pressAndRun(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
+		h.typeText("dir")
 
-		require.Equal(t, "my dir", prompt.value)
+		require.Equal(t, "my dir", h.prompt().input.Value())
+	})
+
+	t.Run(`Given the create form with an empty origin
+	When the user submits it
+	Then an error is shown and nothing is created`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes("c"))
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Equal(t, errOriginRequired.Error(), h.prompt().err)
+		require.Empty(t, h.snapshots.CreateCalls())
+	})
+
+	t.Run(`Given the create form
+	When the user cancels it
+	Then the form is closed with a message`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes("c"))
+
+		h.pressAndRun(key(tea.KeyEsc))
+
+		require.Nil(t, h.model.dialog)
+		require.Equal(t, "Snapshot creation cancelled", h.model.message)
+	})
+
+	t.Run(`Given the snapshots list
+	When the user enters the quit command
+	Then the console quits`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes(":"))
+		h.typeText("q")
+
+		cmd := h.press(key(tea.KeyEnter))
+
+		require.True(t, isQuit(cmd))
+	})
+
+	t.Run(`Given a nested directory of a snapshot
+	When the user enters the snapshots command
+	Then the snapshots list is shown`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(key(tea.KeyEnter))
+		h.pressAndRun(key(tea.KeyEnter))
+		h.pressAndRun(runes(":"))
+		h.typeText("snap")
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Nil(t, h.model.command)
+		require.Equal(t, h.model.snapshots, h.model.top())
+	})
+
+	t.Run(`Given the command line
+	When the user enters an unknown command
+	Then a message reports it`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes(":"))
+		h.typeText("nope")
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Equal(t, "Unknown command: nope", h.model.message)
+	})
+
+	t.Run(`Given an empty command line
+	When the user presses backspace
+	Then the command line is closed`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes(":"))
+
+		h.pressAndRun(key(tea.KeyBackspace))
+
+		require.Nil(t, h.model.command)
+	})
+}
+
+func TestConsoleLayout(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given an error and a small terminal
+	When the console is rendered
+	Then the output fits the terminal`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.model.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+		h.model.err = errors.New("first failure\nsecond failure")
+
+		view := h.view()
+
+		require.Equal(t, 20, lipgloss.Height(view))
+		require.Equal(t, 80, lipgloss.Width(view))
+		require.Contains(t, view, "second failure")
 	})
 }
 
@@ -491,4 +639,36 @@ func TestRepositoryKind(t *testing.T) {
 			require.Equal(t, expected, repositoryKind(repositoryPath))
 		})
 	}
+}
+
+func TestFitColumns(t *testing.T) {
+	t.Parallel()
+
+	widths := func(columns []table.Column) []int {
+		result := make([]int, len(columns))
+		for i, column := range columns {
+			result[i] = column.Width
+		}
+		return result
+	}
+
+	t.Run(`Given the snapshot columns and a wide table
+	When the columns are fitted
+	Then the flexible column takes the remaining width`, func(t *testing.T) {
+		t.Parallel()
+
+		columns := fitColumns(snapshotColumns, 100)
+
+		require.Equal(t, []int{19, 26, 7, 10, 28}, widths(columns))
+	})
+
+	t.Run(`Given the snapshot columns and a narrow table
+	When the columns are fitted
+	Then the columns that do not fit are hidden from the right`, func(t *testing.T) {
+		t.Parallel()
+
+		columns := fitColumns(snapshotColumns, 60)
+
+		require.Equal(t, []int{19, 26, 7, 0, 0}, widths(columns))
+	})
 }

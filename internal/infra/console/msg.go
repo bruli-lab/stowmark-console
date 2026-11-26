@@ -27,7 +27,7 @@ type manifestLoadedMsg struct {
 }
 
 type fileContentLoadedMsg struct {
-	name      string
+	request   filePreviewRequested
 	content   []byte
 	truncated bool
 	err       error

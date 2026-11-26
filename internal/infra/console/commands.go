@@ -3,9 +3,9 @@ package console
 import (
 	"context"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/bruli-lab/stowmark-console/internal/app"
-	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 const maxPreviewSize = 1 << 20
@@ -15,7 +15,7 @@ func (m *Model) startOperation(message string, run func(ctx context.Context) tea
 	m.cancelOperation = cancel
 	m.loading = true
 	m.err = nil
-	m.message = message
+	m.progress = message
 
 	return func() tea.Msg {
 		defer cancel()
@@ -25,6 +25,7 @@ func (m *Model) startOperation(message string, run func(ctx context.Context) tea
 
 func (m *Model) finishOperation() {
 	m.loading = false
+	m.progress = ""
 	if m.cancelOperation != nil {
 		m.cancelOperation()
 		m.cancelOperation = nil
@@ -64,18 +65,18 @@ func (m *Model) openSnapshot(snapshotID string) tea.Cmd {
 	})
 }
 
-func (m *Model) loadFileContent(snapshotID, name string, file snapshot.File) tea.Cmd {
+func (m *Model) loadFileContent(request filePreviewRequested) tea.Cmd {
 	handler := m.handlers.GetFileContent
-	return m.startOperation("Reading "+name+"...", func(ctx context.Context) tea.Msg {
+	return m.startOperation("Reading "+request.name+"...", func(ctx context.Context) tea.Msg {
 		content, err := handler.Handle(ctx, app.GetFileContentQuery{
-			SnapshotID: snapshotID,
-			Path:       file.Path(),
+			SnapshotID: request.snapshotID,
+			Path:       request.file.Path(),
 			MaxSize:    maxPreviewSize,
 		})
 		return fileContentLoadedMsg{
-			name:      name,
+			request:   request,
 			content:   content,
-			truncated: file.Size() > maxPreviewSize,
+			truncated: request.file.Size() > maxPreviewSize,
 			err:       err,
 		}
 	})
