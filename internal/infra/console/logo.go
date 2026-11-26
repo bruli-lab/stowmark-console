@@ -11,17 +11,24 @@ import (
 	"sync"
 )
 
-//go:embed logo.png
-var logoImage []byte
+var (
+	//go:embed logo.png
+	logoImage []byte
+	//go:embed splash.png
+	splashImage []byte
 
-var stowmarkLogo = sync.OnceValue(func() string {
-	decoded, err := png.Decode(bytes.NewReader(logoImage))
+	stowmarkLogo = sync.OnceValue(func() string { return renderLogo(logoImage) })
+	splashLogo   = sync.OnceValue(func() string { return renderLogo(splashImage) })
+)
+
+func renderLogo(encoded []byte) string {
+	decoded, err := png.Decode(bytes.NewReader(encoded))
 	if err != nil {
 		return ""
 	}
 
 	return strings.Join(logoLines(decoded, colorSurface), "\n")
-})
+}
 
 func logoLines(source image.Image, background color.Color) []string {
 	bounds := source.Bounds()

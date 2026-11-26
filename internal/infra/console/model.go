@@ -27,6 +27,7 @@ type Model struct {
 	err             error
 	openDirectory   string
 	opener          FileOpener
+	splash          *splash
 }
 
 type FileOpener func(path string) error
@@ -56,6 +57,10 @@ func New(ctx context.Context, buses app.Buses, options ...Option) Model {
 }
 
 func (m *Model) Init() tea.Cmd {
+	if m.splash != nil {
+		return tea.Batch(m.loadRepositories(), m.splash.timer())
+	}
+
 	return m.loadRepositories()
 }
 
@@ -67,7 +72,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resizeScreens()
 		return m, nil
 
+	case splashFinishedMsg:
+		m.splash = nil
+		return m, nil
+
 	case tea.KeyPressMsg:
+		if m.splash != nil {
+			cmd := m.skipSplash(msg)
+			return m, cmd
+		}
 		cmd := m.handleKey(msg)
 		return m, cmd
 

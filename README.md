@@ -49,6 +49,8 @@ cd stowmark-console
 go build -o stowmark_console ./cmd/console
 ```
 
+The version shown on the start screen is taken from the git tag stamped by `go build` (for example `v1.0.3` on a tag, or a pseudo-version such as `v1.0.3-0.20261126222033-0a91d20a48c6+dirty` between tags). Release builds made by GoReleaser inject it with `-X main.version`. Builds without version control information, such as `go run`, show `dev`.
+
 Optionally install the binary in a directory on your `PATH`:
 
 ```bash
@@ -73,6 +75,8 @@ STOWMARK_REPOSITORY="$HOME/backups/stowmark" stowmark_console
 To work with several repositories, list them in a repositories file (see [Several repositories](#several-repositories)) and switch between them with `:repo`.
 
 If the path does not contain a Stowmark repository yet, the console asks for confirmation before initializing one there. Declining quits without touching the disk, or goes back to the repositories list when several are configured.
+
+On start, the console shows the Stowmark logo and its version for a moment while the repositories load; press any key to skip it.
 
 While the console is running, Stowmark log output is written to a log file (see `STOWMARK_CONSOLE_LOG_FILE`) so it does not corrupt the screen.
 
@@ -214,7 +218,7 @@ The project follows a hexagonal architecture:
 - `internal/app`: one query or command handler per use case on go-core `cqs`, subscribed to a command bus and a query bus (`app.NewBuses`). Commands return domain events.
 - `internal/infra/store`: adapter that implements the ports on top of the Stowmark library, with a single handler per session.
 - `internal/infra/console`: the terminal user interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) v2, which only talks to the application layer. A root model keeps a stack of screens (snapshots, files, preview) and the active dialog; screens emit intent messages and the root model runs the use cases.
-- `internal/config`, `internal/fixtures`, `internal/mocks`: configuration, test data builders and moq mocks.
+- `internal/config`, `internal/buildinfo`, `internal/fixtures`, `internal/mocks`: configuration, version of the binary, test data builders and moq mocks.
 
 ## Development
 

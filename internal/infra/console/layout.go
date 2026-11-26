@@ -28,6 +28,10 @@ func (m *Model) render() string {
 		return "Starting Stowmark Console..."
 	}
 
+	if m.splash != nil {
+		return m.splash.view(m.width, m.height)
+	}
+
 	if m.dialog != nil {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialogStyle.Render(m.dialog.view()))
 	}

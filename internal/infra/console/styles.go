@@ -24,6 +24,12 @@ var (
 			Foreground(colorSecondary).
 			Bold(true)
 
+	surfaceStyle = lipgloss.NewStyle().Background(colorSurface)
+
+	splashVersionStyle = lipgloss.NewStyle().
+				Foreground(colorMuted).
+				Background(colorSurface)
+
 	logoStyle = lipgloss.NewStyle().
 			Background(colorSurface).
 			Align(lipgloss.Center).

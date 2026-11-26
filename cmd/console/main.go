@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/bruli-lab/stowmark-console/internal/app"
+	"github.com/bruli-lab/stowmark-console/internal/buildinfo"
 	"github.com/bruli-lab/stowmark-console/internal/config"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/infra/console"
@@ -15,6 +17,10 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/infra/stderr"
 	"github.com/bruli-lab/stowmark-console/internal/infra/store"
 )
+
+const splashDuration = 1500 * time.Millisecond
+
+var version string
 
 func main() {
 	if err := run(); err != nil {
@@ -62,7 +68,10 @@ func runConsole(conf *config.Config) (err error) {
 	}
 	defer func() { err = errors.Join(err, os.RemoveAll(openDirectory)) }()
 
-	model := console.New(ctx, buses, console.WithFileOpener(openDirectory, desktop.Open))
+	model := console.New(ctx, buses,
+		console.WithFileOpener(openDirectory, desktop.Open),
+		console.WithSplash(buildinfo.Version(version), splashDuration),
+	)
 
 	if _, err := tea.NewProgram(&model).Run(); err != nil {
 		return fmt.Errorf("running console: %w", err)
