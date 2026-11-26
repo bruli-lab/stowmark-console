@@ -823,6 +823,58 @@ func TestConsoleLayout(t *testing.T) {
 		require.Equal(t, 80, lipgloss.Width(view))
 		require.Contains(t, view, "second failure")
 	})
+
+	t.Run(`Given a tall terminal
+	When the console is rendered
+	Then the sidebar shows the logo and the output fits the terminal`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.model.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+
+		view := h.view()
+
+		require.Contains(t, view, "▀")
+		require.Equal(t, 40, lipgloss.Height(view))
+	})
+
+	t.Run(`Given a short terminal
+	When the console is rendered
+	Then the logo is hidden`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.model.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+
+		require.NotContains(t, h.view(), "▀")
+	})
+}
+
+func TestLogoLines(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given the embedded logo
+	When it is drawn
+	Then it uses two pixels per cell and fits the sidebar`, func(t *testing.T) {
+		t.Parallel()
+
+		lines := strings.Split(stowmarkLogo(), "\n")
+
+		require.Len(t, lines, 12)
+		require.Equal(t, 18, ansi.StringWidth(lines[0]))
+		require.LessOrEqual(t, ansi.StringWidth(lines[0]), sidebarContentWidth)
+	})
+
+	t.Run(`Given an image with a transparent and an opaque pixel
+	When it is drawn over a background
+	Then the transparent pixel takes the background color`, func(t *testing.T) {
+		t.Parallel()
+		picture := image.NewNRGBA(image.Rect(0, 0, 1, 2))
+		picture.Set(0, 0, color.NRGBA{})
+		picture.Set(0, 1, color.NRGBA{R: 0, G: 230, B: 240, A: 255})
+
+		lines := logoLines(picture, color.RGBA{R: 24, G: 24, B: 37, A: 255})
+
+		require.Equal(t, []string{"\x1b[38;2;24;24;37m\x1b[48;2;0;230;240m▀\x1b[0m"}, lines)
+	})
 }
 
 func TestIsText(t *testing.T) {

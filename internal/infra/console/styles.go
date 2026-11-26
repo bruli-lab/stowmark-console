@@ -25,9 +25,7 @@ var (
 			Bold(true)
 
 	logoStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#21E6D7")).
 			Background(colorSurface).
-			Bold(true).
 			Align(lipgloss.Center).
 			Width(sidebarContentWidth)
 

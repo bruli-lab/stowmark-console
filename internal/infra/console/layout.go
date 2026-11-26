@@ -10,7 +10,7 @@ import (
 
 const (
 	sidebarTotalWidth = 28
-	minLogoHeight     = 24
+	minLogoHeight     = 32
 	maxErrorLines     = 3
 )
 
@@ -121,7 +121,7 @@ func (m *Model) renderSidebar(availableHeight, width int) string {
 	var builder strings.Builder
 
 	if availableHeight >= minLogoHeight {
-		builder.WriteString(logoStyle.Render(stowmarkLogo))
+		builder.WriteString(logoStyle.Render(stowmarkLogo()))
 		builder.WriteString("\n\n")
 	}
 
