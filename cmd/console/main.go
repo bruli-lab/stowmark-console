@@ -25,12 +25,20 @@ func run() error {
 		return err
 	}
 
-	redirection, err := stderr.RedirectTo(conf.LogFile())
+	redirection, err := stderr.RedirectTo(conf.LogFile)
 	if err != nil {
 		return err
 	}
 
-	model := console.New(context.Background(), conf.Repository())
+	model := console.New(context.Background(), console.Settings{
+		RepositoryPath: conf.Repository,
+		PrivateKey:     conf.PrivateKey,
+		Init: console.InitSettings{
+			PublicKey:        conf.PublicKey,
+			Compression:      conf.Compression,
+			CompressionLevel: conf.CompressionLevel,
+		},
+	})
 	_, runErr := tea.NewProgram(&model, tea.WithAltScreen()).Run()
 
 	if err := redirection.Restore(); err != nil {
@@ -38,7 +46,7 @@ func run() error {
 	}
 
 	if runErr != nil {
-		return fmt.Errorf("running console (logs at %s): %w", conf.LogFile(), runErr)
+		return fmt.Errorf("running console (logs at %s): %w", conf.LogFile, runErr)
 	}
 
 	return nil

@@ -35,7 +35,7 @@ func (m *Model) handleInitConfirmationKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.loading = true
 		m.message = "Initializing repository..."
 
-		return m, initRepositoryCmd(m.ctx, m.repoPath)
+		return m, initRepositoryCmd(m.ctx, m.repoPath, m.initSettings)
 
 	case "n", "N", "esc", "q", "ctrl+c":
 		return m, tea.Quit

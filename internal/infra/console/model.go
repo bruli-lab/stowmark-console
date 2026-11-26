@@ -37,6 +37,7 @@ type Model struct {
 	restoreForm     *textPrompt
 	restore         *restoreRequest
 	privateKey      *string
+	initSettings    InitSettings
 }
 
 type restoreRequest struct {
@@ -45,13 +46,15 @@ type restoreRequest struct {
 	warning     string
 }
 
-func New(ctx context.Context, repositoryPath string) Model {
+func New(ctx context.Context, settings Settings) Model {
 	return Model{
-		ctx:         ctx,
-		loading:     true,
-		folderRepo:  disk.NewFolderRepository(),
-		currentPath: filepath.Clean(repositoryPath),
-		repoPath:    repositoryPath,
+		ctx:          ctx,
+		loading:      true,
+		folderRepo:   disk.NewFolderRepository(),
+		currentPath:  filepath.Clean(settings.RepositoryPath),
+		repoPath:     settings.RepositoryPath,
+		privateKey:   settings.PrivateKey,
+		initSettings: settings.Init,
 	}
 }
 

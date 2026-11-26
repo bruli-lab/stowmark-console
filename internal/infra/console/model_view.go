@@ -77,7 +77,9 @@ func (m *Model) renderInitConfirmation() string {
 	builder.WriteString(headerStyle.Render("Initialize repository"))
 	builder.WriteString("\n\nNo Stowmark repository found at:\n")
 	builder.WriteString(highlightStyle.Render(m.repoPath))
-	builder.WriteString("\n\nA new repository will be created without encryption or compression.")
+	builder.WriteString("\n\nA new repository will be created with:")
+	builder.WriteString("\n  Encryption:  " + m.initSettings.encryptionSummary())
+	builder.WriteString("\n  Compression: " + m.initSettings.compressionSummary())
 
 	if m.initWarning != "" {
 		builder.WriteString("\n\n")

@@ -20,6 +20,19 @@ tasks:
     cmds:
       - go run ./cmd/console
 
+  build:
+    desc: Compilar el binari a bin/
+    cmds:
+      - go build -o bin/stowmark_console ./cmd/console
+
+  mocks:
+    desc: Generar els mocks de les interfícies amb moq
+    cmds:
+      - |
+        set -euo pipefail
+        echo "🧩 Generating mocks with moq..."
+        go tool moq -rm -out internal/domain/repository/folder_repository_mock_test.go -pkg repository_test ./internal/domain/repository FolderRepository
+
   fmt:
     desc: Format Go amb gofumpt
     cmds:

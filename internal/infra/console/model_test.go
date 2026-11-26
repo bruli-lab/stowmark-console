@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/fixtures"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +21,7 @@ func key(keyType tea.KeyType) tea.KeyMsg {
 
 func modelAt(t *testing.T, repositoryPath string) *Model {
 	t.Helper()
-	model := New(t.Context(), repositoryPath)
+	model := New(t.Context(), Settings{RepositoryPath: repositoryPath})
 	return &model
 }
 
@@ -30,7 +31,7 @@ func snapshotsModel(t *testing.T) *Model {
 	model := modelAt(t, root)
 	model.loading = false
 	model.currentPath = filepath.Join(root, "snapshots")
-	model.entries = []repository.Entry{*repository.NewEntry("snapshot-1.json", false, 128)}
+	model.entries = []repository.Entry{fixtures.Entry().WithName("snapshot-1.json").Build()}
 	return model
 }
 

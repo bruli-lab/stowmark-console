@@ -1,9 +1,9 @@
 # Stowmark Console
 
 [![CI](https://github.com/bruli-lab/stowmark-console/actions/workflows/release.yml/badge.svg)](https://github.com/bruli-lab/stowmark-console/actions/workflows/release.yml)
-[![Release](https://img.shields.io/github/v/release/bruli/stowmark-console)](https://github.com/bruli-lab/stowmark-console/releases)
-[![License](https://img.shields.io/github/license/bruli/stowmark-console)](LICENSE)
-[![Go](https://img.shields.io/github/go-mod/go-version/bruli/stowmark-console)](go.mod)
+[![Release](https://img.shields.io/github/v/release/bruli-lab/stowmark-console)](https://github.com/bruli-lab/stowmark-console/releases)
+[![License](https://img.shields.io/github/license/bruli-lab/stowmark-console)](LICENSE)
+[![Go](https://img.shields.io/github/go-mod/go-version/bruli-lab/stowmark-console)](go.mod)
 
 A terminal user interface for browsing and managing local [Stowmark](https://github.com/bruli-lab/stowmark) snapshot repositories.
 
@@ -71,7 +71,22 @@ STOWMARK_REPOSITORY="$HOME/backups/stowmark" stowmark_console
 
 If the path does not contain a Stowmark repository yet, the console asks for confirmation before initializing one there. Declining quits without touching the disk.
 
-While the console is running, Stowmark log output is written to `~/.cache/stowmark-console/console.log` (or `$XDG_CACHE_HOME/stowmark-console/console.log`) so it does not corrupt the screen.
+While the console is running, Stowmark log output is written to a log file (see `STOWMARK_CONSOLE_LOG_FILE`) so it does not corrupt the screen.
+
+### Configuration
+
+The console is configured with environment variables:
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `STOWMARK_REPOSITORY` | yes | | Path (or URL) of the Stowmark repository |
+| `STOWMARK_PRIVATE_KEY` | no | | Private key used to create, verify and restore snapshots of an encrypted repository |
+| `STOWMARK_PUBLIC_KEY` | no | | Public key used to encrypt a repository when it is initialized |
+| `STOWMARK_COMPRESSION` | no | `none` | Compression of a new repository: `none`, `zstd`, `lz4`, `xz` or `gzip` |
+| `STOWMARK_COMPRESSION_LEVEL` | no | | Compression level of a new repository |
+| `STOWMARK_CONSOLE_LOG_FILE` | no | `~/.cache/stowmark-console/console.log` | File that receives Stowmark log output |
+
+The initialization options only apply when the console creates a new repository, and they are shown in the confirmation dialog. Variables read by Stowmark itself, such as `STOWMARK_LOG_LEVEL`, are honored as well.
 
 ## Keyboard controls
 
@@ -104,17 +119,18 @@ Restoring asks for a destination directory first. It defaults to `~/stowmark-res
 
 ## Development
 
-Run the test suite:
+The project uses [Task](https://taskfile.dev/). Run `task` to list every task.
 
-```bash
-go test ./...
-```
-
-Format the code:
-
-```bash
-gofmt -w .
-```
+| Task | Description |
+| --- | --- |
+| `task run` | Start the console against the local `sandbox/repository` |
+| `task build` | Build the binary into `bin/` |
+| `task test` | Run the tests with race detector and coverage, reported with tparse |
+| `task mocks` | Regenerate the interface mocks with moq |
+| `task fmt` | Format the code with gofumpt |
+| `task lint` | Run golangci-lint |
+| `task security` | Run govulncheck |
+| `task check` | Run fmt, fix, security, lint and test in order |
 
 Build a local snapshot release with [GoReleaser](https://goreleaser.com/):
 

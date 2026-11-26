@@ -4,6 +4,7 @@ go 1.27.4
 
 require (
 	github.com/bruli-lab/stowmark v1.14.0
+	github.com/caarlos0/env/v11 v11.4.2
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/stretchr/testify v1.12.1
@@ -42,7 +43,6 @@ require (
 	github.com/aws/smithy-go v1.28.8 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bruli-lab/go-core v1.8.0 // indirect
-	github.com/caarlos0/env/v11 v11.4.2 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.3.1 // indirect
@@ -76,6 +76,7 @@ require (
 	github.com/klauspost/compress v1.20.5 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
+	github.com/matryer/moq v0.8.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.24 // indirect
@@ -133,6 +134,7 @@ require (
 )
 
 tool (
+	github.com/matryer/moq
 	github.com/mfridman/tparse
 	golang.org/x/vuln/cmd/govulncheck
 	mvdan.cc/gofumpt

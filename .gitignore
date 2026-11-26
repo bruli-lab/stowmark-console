@@ -29,3 +29,4 @@ go.work.sum
 # Local working notes
 docs/
 sandbox/
+bin/

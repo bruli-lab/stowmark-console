@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func initRepositoryCmd(ctx context.Context, repositoryPath string) tea.Cmd {
+func initRepositoryCmd(ctx context.Context, repositoryPath string, settings InitSettings) tea.Cmd {
 	return func() tea.Msg {
 		handler, err := stowmark.NewHandler(ctx, repositoryPath)
 		if err != nil {
@@ -15,7 +15,7 @@ func initRepositoryCmd(ctx context.Context, repositoryPath string) tea.Cmd {
 		}
 		defer func() { _ = handler.Close() }()
 
-		if err := handler.InitWithOptions(ctx, stowmark.InitOptions{}); err != nil {
+		if err := handler.InitWithOptions(ctx, settings.options()); err != nil {
 			return initRepositoryMsg{err: err}
 		}
 
