@@ -15,6 +15,14 @@ import (
 func TestListSnapshots(t *testing.T) {
 	t.Parallel()
 
+	t.Run(`Given a query that is not a list snapshots query
+	When it is handled
+	Then an invalid query error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidQuery(t, app.NewListSnapshots(&mocks.SnapshotRepositoryMock{}))
+	})
+
 	t.Run(`Given a repository with snapshots
 	When the snapshots are listed
 	Then they are returned newest first`, func(t *testing.T) {
@@ -51,6 +59,14 @@ func TestListSnapshots(t *testing.T) {
 func TestGetManifest(t *testing.T) {
 	t.Parallel()
 
+	t.Run(`Given a query that is not a get manifest query
+	When it is handled
+	Then an invalid query error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidQuery(t, app.NewGetManifest(&mocks.SnapshotRepositoryMock{}))
+	})
+
 	t.Run(`Given an empty snapshot id
 	When the manifest is requested
 	Then a snapshot id required error is returned without calling the repository`, func(t *testing.T) {
@@ -82,6 +98,14 @@ func TestGetManifest(t *testing.T) {
 
 func TestGetFileContent(t *testing.T) {
 	t.Parallel()
+
+	t.Run(`Given a query that is not a get file content query
+	When it is handled
+	Then an invalid query error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidQuery(t, app.NewGetFileContent(&mocks.SnapshotRepositoryMock{}))
+	})
 
 	tests := []struct {
 		name        string

@@ -14,6 +14,14 @@ import (
 func TestCreateSnapshot(t *testing.T) {
 	t.Parallel()
 
+	t.Run(`Given a command that is not a create snapshot command
+	When it is handled
+	Then an invalid command error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidCommand(t, app.NewCreateSnapshot(&mocks.SnapshotRepositoryMock{}))
+	})
+
 	t.Run(`Given an empty source
 	When a snapshot is created
 	Then a source required error is returned`, func(t *testing.T) {
@@ -35,10 +43,12 @@ func TestCreateSnapshot(t *testing.T) {
 			CreateFunc: func(context.Context, string) (snapshot.Snapshot, error) { return created, nil },
 		}
 
-		event, err := app.NewCreateSnapshot(repo).Handle(t.Context(), app.CreateSnapshotCommand{Source: "/data"})
+		events, err := app.NewCreateSnapshot(repo).Handle(t.Context(), app.CreateSnapshotCommand{Source: "/data"})
 
 		require.NoError(t, err)
+		event := singleEvent[snapshot.Created](t, events, snapshot.CreatedEventName)
 		require.Equal(t, created, event.Snapshot)
+		require.Equal(t, created.ID(), event.AggregateRootID())
 		require.Equal(t, "/data", repo.CreateCalls()[0].Source)
 	})
 
@@ -58,6 +68,14 @@ func TestCreateSnapshot(t *testing.T) {
 
 func TestVerifySnapshot(t *testing.T) {
 	t.Parallel()
+
+	t.Run(`Given a command that is not a verify snapshot command
+	When it is handled
+	Then an invalid command error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidCommand(t, app.NewVerifySnapshot(&mocks.SnapshotRepositoryMock{}))
+	})
 
 	t.Run(`Given an empty snapshot id
 	When it is verified
@@ -79,9 +97,10 @@ func TestVerifySnapshot(t *testing.T) {
 			VerifyFunc: func(context.Context, string) ([]snapshot.Failure, error) { return failures, nil },
 		}
 
-		event, err := app.NewVerifySnapshot(repo).Handle(t.Context(), app.VerifySnapshotCommand{SnapshotID: "snap"})
+		events, err := app.NewVerifySnapshot(repo).Handle(t.Context(), app.VerifySnapshotCommand{SnapshotID: "snap"})
 
 		require.NoError(t, err)
+		event := singleEvent[snapshot.Verified](t, events, snapshot.VerifiedEventName)
 		require.Equal(t, "snap", event.SnapshotID)
 		require.Equal(t, failures, event.Failures)
 		require.False(t, event.Succeeded())
@@ -90,6 +109,14 @@ func TestVerifySnapshot(t *testing.T) {
 
 func TestRestoreSnapshot(t *testing.T) {
 	t.Parallel()
+
+	t.Run(`Given a command that is not a restore snapshot command
+	When it is handled
+	Then an invalid command error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidCommand(t, app.NewRestoreSnapshot(&mocks.SnapshotRepositoryMock{}))
+	})
 
 	tests := []struct {
 		name        string
@@ -123,9 +150,10 @@ func TestRestoreSnapshot(t *testing.T) {
 			RestoreFunc: func(context.Context, string, string) ([]snapshot.Failure, error) { return nil, nil },
 		}
 
-		event, err := app.NewRestoreSnapshot(repo).Handle(t.Context(), app.RestoreSnapshotCommand{SnapshotID: "snap", Destination: "/restore"})
+		events, err := app.NewRestoreSnapshot(repo).Handle(t.Context(), app.RestoreSnapshotCommand{SnapshotID: "snap", Destination: "/restore"})
 
 		require.NoError(t, err)
+		event := singleEvent[snapshot.Restored](t, events, snapshot.RestoredEventName)
 		require.True(t, event.Succeeded())
 		require.Equal(t, "/restore", event.Destination)
 		require.Equal(t, "/restore", repo.RestoreCalls()[0].Destination)
@@ -135,60 +163,63 @@ func TestRestoreSnapshot(t *testing.T) {
 func TestExtractFile(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name     string
-		command  app.ExtractFileCommand
-		expected error
-	}{
-		{
-			name:     "an empty snapshot id",
-			command:  app.ExtractFileCommand{Path: "/data/a.txt", Directory: "/tmp/open"},
-			expected: snapshot.ErrSnapshotIDRequired,
-		},
-		{
-			name:     "an empty file path",
-			command:  app.ExtractFileCommand{SnapshotID: "id", Directory: "/tmp/open"},
-			expected: app.ErrFilePathRequired,
-		},
-		{
-			name:     "a relative directory",
-			command:  app.ExtractFileCommand{SnapshotID: "id", Path: "/data/a.txt", Directory: "open"},
-			expected: app.ErrExtractDirectoryNotAbsolute,
-		},
-	}
+	t.Run(`Given a command that is not an extract file command
+	When it is handled
+	Then an invalid command error is returned`, func(t *testing.T) {
+		t.Parallel()
 
-	for _, tt := range tests {
-		t.Run(`Given `+tt.name+`
-		When the file is extracted
-		Then a validation error is returned without touching the repository`, func(t *testing.T) {
-			t.Parallel()
-			snapshots := &mocks.SnapshotRepositoryMock{}
+		requireInvalidCommand(t, app.NewExtractFile(&mocks.SnapshotRepositoryMock{}))
+	})
 
-			_, err := app.NewExtractFile(snapshots).Handle(t.Context(), tt.command)
+	t.Run(`Given a command with invalid values
+	When the file is extracted
+	Then the file extraction validation error is returned without touching the repository`, func(t *testing.T) {
+		t.Parallel()
+		snapshots := &mocks.SnapshotRepositoryMock{}
 
-			require.ErrorIs(t, err, tt.expected)
-			require.Empty(t, snapshots.ExtractFileCalls())
-		})
-	}
+		_, err := app.NewExtractFile(snapshots).Handle(t.Context(), app.ExtractFileCommand{SnapshotID: "id", Path: "/data/a.txt", Directory: "open"})
+
+		require.ErrorIs(t, err, snapshot.ErrExtractionDirectoryNotAbsolute)
+		require.Empty(t, snapshots.ExtractFileCalls())
+	})
+
+	t.Run(`Given a repository that fails to extract
+	When the file is extracted
+	Then the error is returned without events`, func(t *testing.T) {
+		t.Parallel()
+		snapshots := &mocks.SnapshotRepositoryMock{
+			ExtractFileFunc: func(context.Context, *snapshot.FileExtraction) (string, error) { return "", errBackend },
+		}
+
+		events, err := app.NewExtractFile(snapshots).Handle(t.Context(), app.ExtractFileCommand{SnapshotID: "id", Path: "/data/a.txt", Directory: "/tmp/open"})
+
+		require.ErrorIs(t, err, errBackend)
+		require.Empty(t, events)
+	})
 
 	t.Run(`Given a valid command
 	When the file is extracted
-	Then a file extracted event with its location is returned`, func(t *testing.T) {
+	Then the file extraction is passed to the repository and its file extracted event is returned`, func(t *testing.T) {
 		t.Parallel()
 		snapshots := &mocks.SnapshotRepositoryMock{
-			ExtractFileFunc: func(context.Context, string, string, string) (string, error) {
+			ExtractFileFunc: func(context.Context, *snapshot.FileExtraction) (string, error) {
 				return "/tmp/open/extract-1/a.txt", nil
 			},
 		}
 
-		event, err := app.NewExtractFile(snapshots).Handle(t.Context(), app.ExtractFileCommand{
+		events, err := app.NewExtractFile(snapshots).Handle(t.Context(), app.ExtractFileCommand{
 			SnapshotID: "id",
 			Path:       "/data/a.txt",
 			Directory:  "/tmp/open",
 		})
 
 		require.NoError(t, err)
-		require.Equal(t, snapshot.FileExtracted{SnapshotID: "id", Path: "/data/a.txt", Location: "/tmp/open/extract-1/a.txt"}, event)
-		require.Equal(t, "/tmp/open", snapshots.ExtractFileCalls()[0].Directory)
+		event := singleEvent[snapshot.FileExtracted](t, events, snapshot.FileExtractedEventName)
+		require.Equal(t, "id", event.SnapshotID)
+		require.Equal(t, "/data/a.txt", event.Path)
+		require.Equal(t, "/tmp/open/extract-1/a.txt", event.Location)
+		extraction := snapshots.ExtractFileCalls()[0].Extraction
+		require.Equal(t, "/tmp/open", extraction.Directory())
+		require.Equal(t, "/data/a.txt", extraction.Path())
 	})
 }

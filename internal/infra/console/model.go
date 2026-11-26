@@ -11,7 +11,7 @@ import (
 
 type Model struct {
 	ctx             context.Context
-	handlers        app.Handlers
+	buses           app.Buses
 	repositories    []repository.Profile
 	current         repository.Profile
 	width           int
@@ -40,10 +40,10 @@ func WithFileOpener(directory string, opener FileOpener) Option {
 	}
 }
 
-func New(ctx context.Context, handlers *app.Handlers, options ...Option) Model {
+func New(ctx context.Context, buses app.Buses, options ...Option) Model {
 	model := Model{
 		ctx:       ctx,
-		handlers:  *handlers,
+		buses:     buses,
 		snapshots: newSnapshotsScreen(),
 		loading:   true,
 	}

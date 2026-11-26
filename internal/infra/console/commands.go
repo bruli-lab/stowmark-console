@@ -6,6 +6,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/bruli-lab/stowmark-console/internal/app"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
 
 const maxPreviewSize = 1 << 20
@@ -33,59 +35,59 @@ func (m *Model) finishOperation() {
 }
 
 func (m *Model) loadRepositories() tea.Cmd {
-	handler := m.handlers.ListRepositories
+	bus := m.buses.Queries
 	return m.startOperation("Loading repositories...", func(ctx context.Context) tea.Msg {
-		profiles, err := handler.Handle(ctx, app.ListRepositoriesQuery{})
+		profiles, err := ask[[]repository.Profile](ctx, bus, app.ListRepositoriesQuery{})
 		return repositoriesLoadedMsg{profiles: profiles, err: err}
 	})
 }
 
 func (m *Model) openRepository(name string) tea.Cmd {
-	handler := m.handlers.OpenRepository
+	bus := m.buses.Commands
 	return m.startOperation("Opening repository "+name+"...", func(ctx context.Context) tea.Msg {
-		event, err := handler.Handle(ctx, app.OpenRepositoryCommand{Name: name})
+		event, err := dispatch[repository.Opened](ctx, bus, app.OpenRepositoryCommand{RepositoryName: name})
 		return repositoryOpenedMsg{name: name, event: event, err: err}
 	})
 }
 
 func (m *Model) checkRepository() tea.Cmd {
-	handler := m.handlers.RepositoryStatus
+	bus := m.buses.Queries
 	return m.startOperation("Checking repository...", func(ctx context.Context) tea.Msg {
-		initialized, err := handler.Handle(ctx, app.RepositoryStatusQuery{})
+		initialized, err := ask[bool](ctx, bus, app.RepositoryStatusQuery{})
 		return repositoryStatusMsg{initialized: initialized, err: err}
 	})
 }
 
 func (m *Model) initRepository() tea.Cmd {
-	handler := m.handlers.InitRepository
+	bus := m.buses.Commands
 	options := m.current.Init()
 	return m.startOperation("Initializing repository...", func(ctx context.Context) tea.Msg {
-		event, err := handler.Handle(ctx, app.InitRepositoryCommand{Options: options})
+		event, err := dispatch[repository.Initialized](ctx, bus, app.InitRepositoryCommand{Options: options})
 		return repositoryInitializedMsg{event: event, err: err}
 	})
 }
 
 func (m *Model) loadSnapshots(selectID string) tea.Cmd {
-	handler := m.handlers.ListSnapshots
+	bus := m.buses.Queries
 	return m.startOperation("Loading snapshots...", func(ctx context.Context) tea.Msg {
-		snapshots, err := handler.Handle(ctx, app.ListSnapshotsQuery{})
+		snapshots, err := ask[[]snapshot.Snapshot](ctx, bus, app.ListSnapshotsQuery{})
 		return snapshotsLoadedMsg{snapshots: snapshots, selectID: selectID, err: err}
 	})
 }
 
 func (m *Model) openSnapshot(snapshotID string) tea.Cmd {
-	handler := m.handlers.GetManifest
+	bus := m.buses.Queries
 	return m.startOperation("Loading snapshot "+snapshotID+"...", func(ctx context.Context) tea.Msg {
-		manifest, err := handler.Handle(ctx, app.GetManifestQuery{SnapshotID: snapshotID})
+		manifest, err := ask[snapshot.Manifest](ctx, bus, app.GetManifestQuery{SnapshotID: snapshotID})
 		return manifestLoadedMsg{manifest: manifest, err: err}
 	})
 }
 
 func (m *Model) loadFileContent(request filePreviewRequested) tea.Cmd {
-	handler := m.handlers.GetFileContent
+	bus := m.buses.Queries
 	return m.startOperation("Reading "+request.name+"...", func(ctx context.Context) tea.Msg {
 		limit := previewLimit(request.name)
-		content, err := handler.Handle(ctx, app.GetFileContentQuery{
+		content, err := ask[[]byte](ctx, bus, app.GetFileContentQuery{
 			SnapshotID: request.snapshotID,
 			Path:       request.file.Path(),
 			MaxSize:    limit,
@@ -107,11 +109,11 @@ func (m *Model) openFile(request filePreviewRequested) tea.Cmd {
 		return nil
 	}
 
-	handler := m.handlers.ExtractFile
+	bus := m.buses.Commands
 	directory := m.openDirectory
 	opener := m.opener
 	return m.startOperation("Extracting "+request.name+"...", func(ctx context.Context) tea.Msg {
-		event, err := handler.Handle(ctx, app.ExtractFileCommand{
+		event, err := dispatch[snapshot.FileExtracted](ctx, bus, app.ExtractFileCommand{
 			SnapshotID: request.snapshotID,
 			Path:       request.file.Path(),
 			Directory:  directory,
@@ -124,25 +126,25 @@ func (m *Model) openFile(request filePreviewRequested) tea.Cmd {
 }
 
 func (m *Model) createSnapshot(source string) tea.Cmd {
-	handler := m.handlers.CreateSnapshot
+	bus := m.buses.Commands
 	return m.startOperation("Creating snapshot of "+source+"...", func(ctx context.Context) tea.Msg {
-		event, err := handler.Handle(ctx, app.CreateSnapshotCommand{Source: source})
+		event, err := dispatch[snapshot.Created](ctx, bus, app.CreateSnapshotCommand{Source: source})
 		return snapshotCreatedMsg{event: event, err: err}
 	})
 }
 
 func (m *Model) verifySnapshot(snapshotID string) tea.Cmd {
-	handler := m.handlers.VerifySnapshot
+	bus := m.buses.Commands
 	return m.startOperation("Verifying snapshot "+snapshotID+"...", func(ctx context.Context) tea.Msg {
-		event, err := handler.Handle(ctx, app.VerifySnapshotCommand{SnapshotID: snapshotID})
+		event, err := dispatch[snapshot.Verified](ctx, bus, app.VerifySnapshotCommand{SnapshotID: snapshotID})
 		return snapshotVerifiedMsg{snapshotID: snapshotID, event: event, err: err}
 	})
 }
 
 func (m *Model) restoreSnapshot(request restoreRequest) tea.Cmd {
-	handler := m.handlers.RestoreSnapshot
+	bus := m.buses.Commands
 	return m.startOperation("Restoring snapshot "+request.snapshotID+"...", func(ctx context.Context) tea.Msg {
-		event, err := handler.Handle(ctx, app.RestoreSnapshotCommand{
+		event, err := dispatch[snapshot.Restored](ctx, bus, app.RestoreSnapshotCommand{
 			SnapshotID:  request.snapshotID,
 			Destination: request.destination,
 		})

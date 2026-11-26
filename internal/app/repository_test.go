@@ -2,7 +2,6 @@ package app_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/bruli-lab/stowmark-console/internal/app"
@@ -11,10 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var errBackend = errors.New("backend unavailable")
-
 func TestRepositoryStatus(t *testing.T) {
 	t.Parallel()
+
+	t.Run(`Given a query that is not a repository status query
+	When it is handled
+	Then an invalid query error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidQuery(t, app.NewRepositoryStatus(&mocks.RepositoryMock{}))
+	})
 
 	tests := []struct {
 		name        string
@@ -44,6 +49,14 @@ func TestRepositoryStatus(t *testing.T) {
 func TestInitRepository(t *testing.T) {
 	t.Parallel()
 
+	t.Run(`Given a command that is not an init repository command
+	When it is handled
+	Then an invalid command error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidCommand(t, app.NewInitRepository(&mocks.RepositoryMock{}))
+	})
+
 	t.Run(`Given init options
 	When the repository is initialized
 	Then the options are passed to the repository and an initialized event is returned`, func(t *testing.T) {
@@ -54,10 +67,11 @@ func TestInitRepository(t *testing.T) {
 			InitializeFunc: func(context.Context, repository.InitOptions) error { return nil },
 		}
 
-		event, err := app.NewInitRepository(repo).Handle(t.Context(), app.InitRepositoryCommand{Options: options})
+		events, err := app.NewInitRepository(repo).Handle(t.Context(), app.InitRepositoryCommand{Options: options})
 
 		require.NoError(t, err)
-		require.Equal(t, options, event.Options)
+		initialized := singleEvent[repository.Initialized](t, events, repository.InitializedEventName)
+		require.Equal(t, options, initialized.Options)
 		require.Len(t, repo.InitializeCalls(), 1)
 		require.Equal(t, options, repo.InitializeCalls()[0].Options)
 	})
@@ -78,6 +92,14 @@ func TestInitRepository(t *testing.T) {
 
 func TestListRepositories(t *testing.T) {
 	t.Parallel()
+
+	t.Run(`Given a query that is not a list repositories query
+	When it is handled
+	Then an invalid query error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidQuery(t, app.NewListRepositories(&mocks.CatalogMock{}))
+	})
 
 	t.Run(`Given a catalog with profiles
 	When the repositories are listed
@@ -110,6 +132,14 @@ func TestListRepositories(t *testing.T) {
 func TestOpenRepository(t *testing.T) {
 	t.Parallel()
 
+	t.Run(`Given a command that is not an open repository command
+	When it is handled
+	Then an invalid command error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidCommand(t, app.NewOpenRepository(&mocks.CatalogMock{}))
+	})
+
 	t.Run(`Given a repository name
 	When the repository is opened
 	Then an opened event with its profile is returned`, func(t *testing.T) {
@@ -119,10 +149,12 @@ func TestOpenRepository(t *testing.T) {
 			OpenFunc: func(context.Context, string) (repository.Profile, error) { return profile, nil },
 		}
 
-		event, err := app.NewOpenRepository(catalog).Handle(t.Context(), app.OpenRepositoryCommand{Name: "nas"})
+		events, err := app.NewOpenRepository(catalog).Handle(t.Context(), app.OpenRepositoryCommand{RepositoryName: "nas"})
 
 		require.NoError(t, err)
-		require.Equal(t, profile, event.Profile)
+		opened := singleEvent[repository.Opened](t, events, repository.OpenedEventName)
+		require.Equal(t, profile, opened.Profile)
+		require.Equal(t, "nas", opened.AggregateRootID())
 		require.Equal(t, "nas", catalog.OpenCalls()[0].Name)
 	})
 
@@ -146,7 +178,7 @@ func TestOpenRepository(t *testing.T) {
 			OpenFunc: func(context.Context, string) (repository.Profile, error) { return repository.Profile{}, errBackend },
 		}
 
-		_, err := app.NewOpenRepository(catalog).Handle(t.Context(), app.OpenRepositoryCommand{Name: "nas"})
+		_, err := app.NewOpenRepository(catalog).Handle(t.Context(), app.OpenRepositoryCommand{RepositoryName: "nas"})
 
 		require.ErrorIs(t, err, errBackend)
 	})

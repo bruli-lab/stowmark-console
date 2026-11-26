@@ -210,8 +210,8 @@ While an operation is running, `Esc` cancels it.
 
 The project follows a hexagonal architecture:
 
-- `internal/domain`: entities, value objects, events and ports (`repository`, `snapshot`).
-- `internal/app`: one query or command handler per use case (CQS). Commands return domain events.
+- `internal/domain`: entities, aggregates, value objects, events and ports (`repository`, `snapshot`). Events and aggregates are built on [go-core](https://github.com/bruli-lab/go-core) `event`.
+- `internal/app`: one query or command handler per use case on go-core `cqs`, subscribed to a command bus and a query bus (`app.NewBuses`). Commands return domain events.
 - `internal/infra/store`: adapter that implements the ports on top of the Stowmark library, with a single handler per session.
 - `internal/infra/console`: the terminal user interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) v2, which only talks to the application layer. A root model keeps a stack of screens (snapshots, files, preview) and the active dialog; screens emit intent messages and the root model runs the use cases.
 - `internal/config`, `internal/fixtures`, `internal/mocks`: configuration, test data builders and moq mocks.

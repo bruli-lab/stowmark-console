@@ -60,8 +60,8 @@ func newHarness(t *testing.T, initialized bool) *harness {
 			return nil, ctx.Err()
 		},
 		RestoreFunc: func(context.Context, string, string) ([]snapshot.Failure, error) { return nil, nil },
-		ExtractFileFunc: func(_ context.Context, _, path, directory string) (string, error) {
-			return filepath.Join(directory, filepath.Base(path)), nil
+		ExtractFileFunc: func(_ context.Context, extraction *snapshot.FileExtraction) (string, error) {
+			return filepath.Join(extraction.Directory(), filepath.Base(extraction.Path())), nil
 		},
 	}
 	h := &harness{
@@ -82,9 +82,9 @@ func newHarness(t *testing.T, initialized bool) *harness {
 			return repository.Profile{}, errUnreachable
 		},
 	}
-	handlers := app.NewHandlers(h.catalog, repositories, snapshots)
+	buses := app.NewBuses(h.catalog, repositories, snapshots)
 	h.openDirectory = t.TempDir()
-	model := New(t.Context(), &handlers, WithFileOpener(h.openDirectory, func(path string) error {
+	model := New(t.Context(), buses, WithFileOpener(h.openDirectory, func(path string) error {
 		h.opened = append(h.opened, path)
 		return h.openErr
 	}))
@@ -370,8 +370,8 @@ func TestConsoleOpenFile(t *testing.T) {
 		h.pressAndRun(runes("o"))
 
 		call := h.snapshots.ExtractFileCalls()[0]
-		require.Equal(t, "/home/user/documents/README.txt", call.Path)
-		require.Equal(t, h.openDirectory, call.Directory)
+		require.Equal(t, "/home/user/documents/README.txt", call.Extraction.Path())
+		require.Equal(t, h.openDirectory, call.Extraction.Directory())
 		require.Equal(t, []string{filepath.Join(h.openDirectory, "README.txt")}, h.opened)
 		require.Contains(t, h.model.message, "Opened README.txt")
 	})

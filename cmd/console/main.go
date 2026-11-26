@@ -55,14 +55,14 @@ func runConsole(conf *config.Config) (err error) {
 	defer func() { err = errors.Join(err, session.Close()) }()
 
 	catalog := store.NewCatalog(session, catalogEntries(conf.Repositories))
-	handlers := app.NewHandlers(catalog, store.NewRepositories(session), store.NewSnapshots(session))
+	buses := app.NewBuses(catalog, store.NewRepositories(session), store.NewSnapshots(session))
 	openDirectory, err := os.MkdirTemp("", "stowmark-console-open-*")
 	if err != nil {
 		return fmt.Errorf("creating the directory for opened files: %w", err)
 	}
 	defer func() { err = errors.Join(err, os.RemoveAll(openDirectory)) }()
 
-	model := console.New(ctx, &handlers, console.WithFileOpener(openDirectory, desktop.Open))
+	model := console.New(ctx, buses, console.WithFileOpener(openDirectory, desktop.Open))
 
 	if _, err := tea.NewProgram(&model).Run(); err != nil {
 		return fmt.Errorf("running console: %w", err)

@@ -140,18 +140,18 @@ func (s *Snapshots) FileContent(ctx context.Context, snapshotID, path string, ma
 	return io.ReadAll(io.LimitReader(file, maxSize))
 }
 
-func (s *Snapshots) ExtractFile(ctx context.Context, snapshotID, path, directory string) (string, error) {
+func (s *Snapshots) ExtractFile(ctx context.Context, extraction *snapshot.FileExtraction) (string, error) {
 	handler, err := s.session.current()
 	if err != nil {
 		return "", err
 	}
 
-	target, err := os.MkdirTemp(directory, "extract-*")
+	target, err := os.MkdirTemp(extraction.Directory(), "extract-*")
 	if err != nil {
 		return "", fmt.Errorf("create extraction directory: %w", err)
 	}
 
-	return restoreSingleFile(ctx, handler, snapshotID, path, target)
+	return restoreSingleFile(ctx, handler, extraction.SnapshotID(), extraction.Path(), target)
 }
 
 func restoreSingleFile(ctx context.Context, handler *stowmark.Handler, snapshotID, path, directory string) (string, error) {

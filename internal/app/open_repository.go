@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/bruli-lab/go-core/cqs"
+	"github.com/bruli-lab/go-core/event"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 )
+
+const OpenRepositoryCommandName = "open-repository"
 
 var (
 	ErrNoRepositories         = errors.New("no repositories configured")
@@ -13,26 +17,35 @@ var (
 )
 
 type OpenRepositoryCommand struct {
-	Name string
+	RepositoryName string
+}
+
+func (OpenRepositoryCommand) Name() string {
+	return OpenRepositoryCommandName
 }
 
 type OpenRepository struct {
 	catalog repository.Catalog
 }
 
-func NewOpenRepository(catalog repository.Catalog) *OpenRepository {
-	return &OpenRepository{catalog: catalog}
+func NewOpenRepository(catalog repository.Catalog) OpenRepository {
+	return OpenRepository{catalog: catalog}
 }
 
-func (h *OpenRepository) Handle(ctx context.Context, cmd OpenRepositoryCommand) (repository.Opened, error) {
-	if cmd.Name == "" {
-		return repository.Opened{}, ErrRepositoryNameRequired
+func (h OpenRepository) Handle(ctx context.Context, command cqs.Command) ([]event.Event, error) {
+	cmd, ok := command.(OpenRepositoryCommand)
+	if !ok {
+		return nil, cqs.NewInvalidCommandError(OpenRepositoryCommandName, command.Name())
 	}
 
-	profile, err := h.catalog.Open(ctx, cmd.Name)
+	if cmd.RepositoryName == "" {
+		return nil, ErrRepositoryNameRequired
+	}
+
+	profile, err := h.catalog.Open(ctx, cmd.RepositoryName)
 	if err != nil {
-		return repository.Opened{}, err
+		return nil, err
 	}
 
-	return repository.Opened{Profile: profile}, nil
+	return []event.Event{repository.NewOpened(profile)}, nil
 }

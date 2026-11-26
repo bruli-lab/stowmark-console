@@ -2,16 +2,13 @@ package app
 
 import (
 	"context"
-	"errors"
-	"path/filepath"
 
+	"github.com/bruli-lab/go-core/cqs"
+	"github.com/bruli-lab/go-core/event"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
 
-var (
-	ErrFilePathRequired            = errors.New("file path is required")
-	ErrExtractDirectoryNotAbsolute = errors.New("extraction directory must be absolute")
-)
+const ExtractFileCommandName = "extract-file"
 
 type ExtractFileCommand struct {
 	SnapshotID string
@@ -19,28 +16,37 @@ type ExtractFileCommand struct {
 	Directory  string
 }
 
+func (ExtractFileCommand) Name() string {
+	return ExtractFileCommandName
+}
+
 type ExtractFile struct {
 	snapshots snapshot.Repository
 }
 
-func NewExtractFile(snapshots snapshot.Repository) *ExtractFile {
-	return &ExtractFile{snapshots: snapshots}
+func NewExtractFile(snapshots snapshot.Repository) ExtractFile {
+	return ExtractFile{snapshots: snapshots}
 }
 
-func (h *ExtractFile) Handle(ctx context.Context, cmd ExtractFileCommand) (snapshot.FileExtracted, error) {
-	switch {
-	case cmd.SnapshotID == "":
-		return snapshot.FileExtracted{}, snapshot.ErrSnapshotIDRequired
-	case cmd.Path == "":
-		return snapshot.FileExtracted{}, ErrFilePathRequired
-	case !filepath.IsAbs(cmd.Directory):
-		return snapshot.FileExtracted{}, ErrExtractDirectoryNotAbsolute
+func (h ExtractFile) Handle(ctx context.Context, command cqs.Command) ([]event.Event, error) {
+	cmd, ok := command.(ExtractFileCommand)
+	if !ok {
+		return nil, cqs.NewInvalidCommandError(ExtractFileCommandName, command.Name())
 	}
 
-	location, err := h.snapshots.ExtractFile(ctx, cmd.SnapshotID, cmd.Path, cmd.Directory)
+	extraction, err := snapshot.NewFileExtraction(cmd.SnapshotID, cmd.Path, cmd.Directory)
 	if err != nil {
-		return snapshot.FileExtracted{}, err
+		return nil, err
 	}
 
-	return snapshot.FileExtracted{SnapshotID: cmd.SnapshotID, Path: cmd.Path, Location: location}, nil
+	location, err := h.snapshots.ExtractFile(ctx, extraction)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := extraction.Extracted(location); err != nil {
+		return nil, err
+	}
+
+	return extraction.Events(), nil
 }

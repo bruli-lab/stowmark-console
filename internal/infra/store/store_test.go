@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/infra/store"
 	"github.com/stretchr/testify/require"
 )
@@ -118,7 +119,10 @@ func exerciseRepository(t *testing.T, repositoryURL string) {
 	Then the whole file is written inside that directory`, func(t *testing.T) {
 		directory := t.TempDir()
 
-		location, err := snapshots.ExtractFile(t.Context(), snapshotID, filepath.Join(source, "README.txt"), directory)
+		extraction, err := snapshot.NewFileExtraction(snapshotID, filepath.Join(source, "README.txt"), directory)
+		require.NoError(t, err)
+
+		location, err := snapshots.ExtractFile(t.Context(), extraction)
 
 		require.NoError(t, err)
 		require.True(t, strings.HasPrefix(location, directory))
