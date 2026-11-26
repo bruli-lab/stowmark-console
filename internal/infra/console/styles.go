@@ -69,24 +69,21 @@ var (
 			Background(colorSurface).
 			Padding(0, 1)
 
-	confirmRestoreStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(colorText).
-				Background(colorPrimary).
-				Padding(1, 2).
-				MarginLeft(2)
+	highlightStyle = lipgloss.NewStyle().
+			Foreground(colorSecondary).
+			Bold(true)
 
-	snapshotFormStyle = lipgloss.NewStyle().
-				Foreground(colorText).
-				Background(colorSurface).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(colorPrimary).
-				Padding(1, 2).
-				Width(56)
+	dialogStyle = lipgloss.NewStyle().
+			Foreground(colorText).
+			Background(colorSurface).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorPrimary).
+			Padding(1, 2).
+			Width(64)
 
-	snapshotInputStyle = lipgloss.NewStyle().
-				Foreground(colorText).
-				Background(colorSelected).
-				Padding(0, 1).
-				Width(48)
+	inputStyle = lipgloss.NewStyle().
+			Foreground(colorText).
+			Background(colorSelected).
+			Padding(0, 1).
+			Width(56)
 )

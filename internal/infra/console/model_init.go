@@ -1,6 +1,8 @@
 package console
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -8,35 +10,22 @@ import (
 )
 
 func (m *Model) Init() tea.Cmd {
-	configPath := filepath.Join(m.repoPath, "config.json")
+	_, err := os.Stat(filepath.Join(m.repoPath, "config.json"))
 
-	_, err := os.Stat(configPath)
 	switch {
 	case err == nil:
-		return loadRepositoryContent(
-			m.ctx,
-			m.folderRepo,
-			m.currentPath,
-		)
+		return loadRepositoryContent(m.ctx, m.folderRepo, m.currentPath)
 
-	case os.IsNotExist(err):
-		m.loading = true
-		m.message = "Initializing repository..."
+	case errors.Is(err, fs.ErrNotExist):
+		m.loading = false
+		m.confirmingInit = true
+		m.initWarning = initRepositoryWarning(m.repoPath)
 
-		return initRepositoryCmd(
-			m.ctx,
-			m.repoPath,
-			m.formatVersion,
-			m.publicKey,
-			m.force,
-		)
+		return nil
 
 	default:
 		return func() tea.Msg {
-			return repositoryLoadedMsg{
-				path: m.repoPath,
-				err:  err,
-			}
+			return repositoryLoadedMsg{path: m.repoPath, err: err}
 		}
 	}
 }

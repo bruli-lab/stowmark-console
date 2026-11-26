@@ -10,10 +10,6 @@ type repositoryLoadedMsg struct {
 	path    string
 }
 
-type editorFinishedMsg struct {
-	err error
-}
-
 type filePreviewLoadedMsg struct {
 	path    string
 	content string
@@ -26,8 +22,9 @@ type snapshotVerifiedMsg struct {
 }
 
 type snapshotRestoredMsg struct {
-	snapshotID string
-	err        error
+	snapshotID  string
+	destination string
+	err         error
 }
 
 type snapshotCreatedMsg struct {

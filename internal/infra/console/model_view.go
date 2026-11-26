@@ -1,7 +1,6 @@
 package console
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -12,6 +11,21 @@ func (m *Model) View() string {
 		return "Starting Stowmark Console..."
 	}
 
+	switch {
+	case m.confirmingInit:
+		return m.renderDialog(m.renderInitConfirmation())
+	case m.snapshotForm != nil:
+		return m.renderDialog(m.snapshotForm.render("[Enter] Create  [Esc] Cancel"))
+	case m.restoreForm != nil:
+		return m.renderDialog(m.restoreForm.render("[Enter] Continue  [Esc] Cancel"))
+	case m.confirmingRestore():
+		return m.renderDialog(m.renderRestoreConfirmation())
+	default:
+		return m.renderLayout()
+	}
+}
+
+func (m *Model) renderLayout() string {
 	header := m.renderHeader()
 	footer := m.renderFooter()
 
@@ -27,23 +41,10 @@ func (m *Model) View() string {
 	contentFrameWidth := contentStyle.GetHorizontalFrameSize()
 	contentFrameHeight := contentStyle.GetVerticalFrameSize()
 
-	sidebarWidth := max(
-		1,
-		sidebarTotalWidth-sidebarFrameWidth,
-	)
-	contentWidth := max(
-		1,
-		m.width-sidebarTotalWidth-contentFrameWidth,
-	)
-
-	sidebarHeight := max(
-		1,
-		bodyHeight-sidebarFrameHeight,
-	)
-	contentHeight := max(
-		1,
-		bodyHeight-contentFrameHeight,
-	)
+	sidebarWidth := max(1, sidebarTotalWidth-sidebarFrameWidth)
+	contentWidth := max(1, m.width-sidebarTotalWidth-contentFrameWidth)
+	sidebarHeight := max(1, bodyHeight-sidebarFrameHeight)
+	contentHeight := max(1, bodyHeight-contentFrameHeight)
 
 	sidebar := sidebarStyle.
 		Width(sidebarWidth).
@@ -55,64 +56,54 @@ func (m *Model) View() string {
 		Height(contentHeight).
 		Render(m.renderContent(contentHeight))
 
-	body := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		sidebar,
-		content,
+	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, content)
+
+	return lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
+}
+
+func (m *Model) renderDialog(content string) string {
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		dialogStyle.Render(content),
 	)
+}
 
-	view := lipgloss.JoinVertical(
-		lipgloss.Left,
-		header,
-		body,
-		footer,
-	)
+func (m *Model) renderInitConfirmation() string {
+	var builder strings.Builder
 
-	if m.confirmingRestore {
-		confirmation := confirmRestoreStyle.Render(
-			fmt.Sprintf(
-				"Restore snapshot %s?\n\n[y/Enter] Confirm  [n/Esc] Cancel",
-				m.pendingSnapshotID,
-			),
-		)
+	builder.WriteString(headerStyle.Render("Initialize repository"))
+	builder.WriteString("\n\nNo Stowmark repository found at:\n")
+	builder.WriteString(highlightStyle.Render(m.repoPath))
+	builder.WriteString("\n\nA new repository will be created without encryption or compression.")
 
-		return lipgloss.Place(
-			m.width,
-			m.height,
-			lipgloss.Center,
-			lipgloss.Center,
-			confirmation,
-		)
+	if m.initWarning != "" {
+		builder.WriteString("\n\n")
+		builder.WriteString(errorStyle.Render(m.initWarning))
 	}
 
-	if m.creatingSnapshot {
-		origin := m.snapshotOrigin
-		if origin == "" {
-			origin = " "
-		}
+	builder.WriteString("\n\n[y] Initialize  [n/Esc] Quit")
 
-		var form strings.Builder
-		form.WriteString(headerStyle.Render("Create snapshot"))
-		form.WriteString("\n\nOrigin\n")
-		form.WriteString(snapshotInputStyle.Render(origin + "█"))
+	return builder.String()
+}
 
-		if m.snapshotFormError != "" {
-			form.WriteString("\n\n")
-			form.WriteString(errorStyle.Render(m.snapshotFormError))
-		}
+func (m *Model) renderRestoreConfirmation() string {
+	var builder strings.Builder
 
-		form.WriteString("\n\n[Enter] Create  [Esc] Cancel")
+	builder.WriteString(headerStyle.Render("Restore snapshot " + m.restore.snapshotID + "?"))
+	builder.WriteString("\n\nDestination:\n")
+	builder.WriteString(highlightStyle.Render(m.restore.destination))
 
-		return lipgloss.Place(
-			m.width,
-			m.height,
-			lipgloss.Center,
-			lipgloss.Center,
-			snapshotFormStyle.Render(form.String()),
-		)
+	if m.restore.warning != "" {
+		builder.WriteString("\n\n")
+		builder.WriteString(errorStyle.Render(m.restore.warning))
 	}
 
-	return view
+	builder.WriteString("\n\n[y] Confirm  [n/Esc] Cancel")
+
+	return builder.String()
 }
 
 func (m *Model) renderHeader() string {
@@ -134,7 +125,7 @@ func (m *Model) renderFooter() string {
 	if m.isSnapshotsDirectory() {
 		help = "↑↓ Navigate   ↵ Open   [c] Create   [v] Verify   [x] Restore   [esc] Back   [:q] Exit"
 	} else {
-		help = "↑↓ Navigate   ↵ Open   [e] Edit   [r] Refresh   [:q] Exit"
+		help = "↑↓ Navigate   ↵ Open   [r] Refresh   [:q] Exit"
 	}
 
 	if m.commandMode {

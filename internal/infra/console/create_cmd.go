@@ -21,6 +21,7 @@ func createSnapshotCmd(
 			msg.err = err
 			return msg
 		}
+		defer func() { _ = handler.Close() }()
 
 		result, err := handler.CreateSnapshot(ctx, origin, privateKey)
 		if err != nil {

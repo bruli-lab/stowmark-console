@@ -7,24 +7,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func initRepositoryCmd(
-	ctx context.Context,
-	repositoryPath string,
-	formatVersion int,
-	publicKey *string,
-	force bool,
-) tea.Cmd {
+func initRepositoryCmd(ctx context.Context, repositoryPath string) tea.Cmd {
 	return func() tea.Msg {
 		handler, err := stowmark.NewHandler(ctx, repositoryPath)
 		if err != nil {
 			return initRepositoryMsg{err: err}
 		}
+		defer func() { _ = handler.Close() }()
 
-		compression := stowmark.Compression{
-			Type:  "none",
-			Level: nil,
-		}
-		if err := handler.Init(ctx, &compression, formatVersion, publicKey, force); err != nil {
+		if err := handler.InitWithOptions(ctx, stowmark.InitOptions{}); err != nil {
 			return initRepositoryMsg{err: err}
 		}
 

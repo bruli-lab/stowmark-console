@@ -7,17 +7,16 @@
 
 A terminal user interface for browsing and managing local [Stowmark](https://github.com/bruli-lab/stowmark) snapshot repositories.
 
-Stowmark Console provides a compact, keyboard-driven interface for inspecting repository contents, previewing and editing text files, creating snapshots, verifying their integrity, and restoring them.
+Stowmark Console provides a compact, keyboard-driven interface for inspecting repository contents, previewing text files, creating snapshots, verifying their integrity, and restoring them.
 
 ## Features
 
 - Browse a Stowmark repository without leaving the terminal
-- Automatically initialize the repository when it does not exist
+- Offer to initialize the repository when it does not exist
 - Preview text files with line numbers and scrolling
-- Open text files in your preferred terminal editor
 - Create snapshots from a selected source directory
 - Verify the integrity of a snapshot
-- Restore a snapshot after an explicit confirmation
+- Restore a snapshot to a chosen destination after an explicit confirmation
 - Navigate using arrow keys or Vim-style key bindings
 
 > [!NOTE]
@@ -28,9 +27,6 @@ Stowmark Console provides a compact, keyboard-driven interface for inspecting re
 - Linux
 - Go 1.27.4 or newer when building from source
 - A terminal with color support
-- An optional terminal editor for the edit action
-
-The editor is selected in this order: `VISUAL`, `EDITOR`, `nvim`, `vim`, `nano`, then `vi`.
 
 ## Installation
 
@@ -73,7 +69,9 @@ You can also set the variable for a single invocation:
 STOWMARK_REPOSITORY="$HOME/backups/stowmark" stowmark_console
 ```
 
-If the path does not contain a Stowmark repository yet, the console initializes one there automatically.
+If the path does not contain a Stowmark repository yet, the console asks for confirmation before initializing one there. Declining quits without touching the disk.
+
+While the console is running, Stowmark log output is written to `~/.cache/stowmark-console/console.log` (or `$XDG_CACHE_HOME/stowmark-console/console.log`) so it does not corrupt the screen.
 
 ## Keyboard controls
 
@@ -81,11 +79,10 @@ If the path does not contain a Stowmark repository yet, the console initializes 
 
 | Key | Action |
 | --- | --- |
-| `â†‘` / `k` | Select the previous entry |
-| `â†“` / `j` | Select the next entry |
+| `↑` / `k` | Select the previous entry |
+| `↓` / `j` | Select the next entry |
 | `Enter` | Open a directory or preview a file |
-| `Backspace` / `Esc` / `â†` / `h` | Go to the parent directory |
-| `e` | Edit the selected text file |
+| `Backspace` / `Esc` / `←` / `h` | Go to the parent directory |
 | `r` | Refresh the current directory |
 | `g` / `Home` | Select the first entry |
 | `G` / `End` | Select the last entry |
@@ -101,7 +98,9 @@ The following actions are available while browsing the repository's `snapshots` 
 | `v` | Verify the selected snapshot |
 | `x` | Restore the selected snapshot |
 
-Creating a snapshot opens a small form for the source directory. Restoring requires confirmation before any files are written.
+Creating a snapshot opens a small form for the source directory.
+
+Restoring asks for a destination directory first. It defaults to `~/stowmark-restore/<snapshot-id>`, never to the original source. The confirmation shows the destination and warns when it already contains files, which would be overwritten. Only `y` confirms the restore.
 
 ## Development
 
@@ -125,7 +124,7 @@ goreleaser release --snapshot --clean
 
 ## Related project
 
-- [Stowmark](https://github.com/bruli-lab/stowmark) â€” immutable snapshot backup engine used by this console.
+- [Stowmark](https://github.com/bruli-lab/stowmark) — immutable snapshot backup engine used by this console.
 
 ## License
 

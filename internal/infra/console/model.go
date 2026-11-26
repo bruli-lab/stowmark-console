@@ -7,108 +7,81 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bruli-lab/stowmark-console/internal/config"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/infra/disk"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type Model struct {
-	ctx               context.Context
-	conf              *config.Config
-	folderRepo        repository.FolderRepository
-	entries           []repository.Entry
-	cursor            int
-	currentPath       string
-	previewPath       string
-	previewLines      []string
-	previewOffset     int
-	previewing        bool
-	width             int
-	height            int
-	loading           bool
-	err               error
-	commandMode       bool
-	commandInput      string
-	message           string
-	repoPath          string
-	confirmingRestore bool
-	pendingSnapshotID string
-	creatingSnapshot  bool
-	snapshotOrigin    string
-	snapshotFormError string
-	preserveMessage   bool
-	formatVersion     int
-	publicKey         *string
-	force             bool
-	privateKey        *string
-	destinationPath   *string
+	ctx             context.Context
+	folderRepo      repository.FolderRepository
+	repoPath        string
+	entries         []repository.Entry
+	cursor          int
+	currentPath     string
+	previewPath     string
+	previewLines    []string
+	previewOffset   int
+	previewing      bool
+	width           int
+	height          int
+	loading         bool
+	err             error
+	commandMode     bool
+	commandInput    string
+	message         string
+	preserveMessage bool
+	confirmingInit  bool
+	initWarning     string
+	snapshotForm    *textPrompt
+	restoreForm     *textPrompt
+	restore         *restoreRequest
+	privateKey      *string
 }
 
-func New(ctx context.Context, conf *config.Config) Model {
+type restoreRequest struct {
+	snapshotID  string
+	destination string
+	warning     string
+}
+
+func New(ctx context.Context, repositoryPath string) Model {
 	return Model{
 		ctx:         ctx,
-		conf:        conf,
 		loading:     true,
 		folderRepo:  disk.NewFolderRepository(),
-		currentPath: filepath.Clean(conf.Repository()),
-		repoPath:    conf.Repository(),
+		currentPath: filepath.Clean(repositoryPath),
+		repoPath:    repositoryPath,
 	}
 }
 
-func (m *Model) openSelectedFile() tea.Cmd {
-	if len(m.entries) == 0 ||
-		m.cursor < 0 ||
-		m.cursor >= len(m.entries) {
-		return nil
-	}
-
-	entry := m.entries[m.cursor]
-	if entry.IsDir() {
-		return nil
-	}
-
-	filePath := filepath.Join(
-		m.currentPath,
-		entry.Name(),
-	)
-
-	isText, err := m.folderRepo.IsTextFile(m.ctx, filePath)
-	if err != nil {
-		return func() tea.Msg {
-			return editorFinishedMsg{err: err}
-		}
-	}
-
-	if !isText {
-		return func() tea.Msg {
-			return editorFinishedMsg{
-				err: fmt.Errorf("%q no és un fitxer de text", entry.Name()),
-			}
-		}
-	}
-
-	command, err := editorCommand(filePath)
-	if err != nil {
-		return func() tea.Msg {
-			return editorFinishedMsg{err: err}
-		}
-	}
-
-	return tea.ExecProcess(command, func(err error) tea.Msg {
-		return editorFinishedMsg{err: err}
-	})
+func (m *Model) rootPath() string {
+	return filepath.Clean(m.repoPath)
 }
 
-func (m *Model) requestRestore(snapshotID string) {
-	m.confirmingRestore = true
-	m.pendingSnapshotID = snapshotID
-	m.err = nil
-	m.message = ""
+func (m *Model) confirmingRestore() bool {
+	return m.restore != nil && m.restoreForm == nil
+}
+
+func (m *Model) selectedEntry() (repository.Entry, bool) {
+	if m.cursor < 0 || m.cursor >= len(m.entries) {
+		return repository.Entry{}, false
+	}
+
+	return m.entries[m.cursor], true
+}
+
+func (m *Model) selectedSnapshotID() (string, bool) {
+	entry, ok := m.selectedEntry()
+	if !ok || !m.isSnapshotsDirectory() || entry.IsDir() {
+		return "", false
+	}
+
+	return strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name())), true
 }
 
 func (m *Model) activeSection() string {
-	rootPath := filepath.Clean(m.conf.Repository())
+	rootPath := m.rootPath()
 	currentPath := filepath.Clean(m.currentPath)
 
 	relativePath, err := filepath.Rel(rootPath, currentPath)
@@ -133,27 +106,9 @@ func (m *Model) previewVisibleLines() int {
 }
 
 func (m *Model) isSnapshotsDirectory() bool {
-	snapshotsPath := filepath.Join(
-		filepath.Clean(m.conf.Repository()),
-		"snapshots",
-	)
+	snapshotsPath := filepath.Join(m.rootPath(), "snapshots")
 
 	return filepath.Clean(m.currentPath) == snapshotsPath
-}
-
-func (m *Model) selectedSnapshotPath() (string, bool) {
-	if !m.isSnapshotsDirectory() ||
-		len(m.entries) == 0 ||
-		m.cursor < 0 ||
-		m.cursor >= len(m.entries) ||
-		m.entries[m.cursor].IsDir() {
-		return "", false
-	}
-
-	return filepath.Join(
-		m.currentPath,
-		m.entries[m.cursor].Name(),
-	), true
 }
 
 func (m *Model) renderSidebar(availableHeight int) string {
@@ -204,14 +159,8 @@ func (m *Model) renderSidebar(availableHeight int) string {
 }
 
 func (m *Model) previewSelectedFile() tea.Cmd {
-	if len(m.entries) == 0 ||
-		m.cursor < 0 ||
-		m.cursor >= len(m.entries) {
-		return nil
-	}
-
-	entry := m.entries[m.cursor]
-	if entry.IsDir() {
+	entry, ok := m.selectedEntry()
+	if !ok || entry.IsDir() {
 		return nil
 	}
 
@@ -362,14 +311,8 @@ func (m *Model) renderContent(availableHeight int) string {
 }
 
 func (m *Model) openSelectedDirectory() tea.Cmd {
-	if len(m.entries) == 0 ||
-		m.cursor < 0 ||
-		m.cursor >= len(m.entries) {
-		return nil
-	}
-
-	entry := m.entries[m.cursor]
-	if !entry.IsDir() {
+	entry, ok := m.selectedEntry()
+	if !ok || !entry.IsDir() {
 		return nil
 	}
 
@@ -383,7 +326,7 @@ func (m *Model) openSelectedDirectory() tea.Cmd {
 }
 
 func (m *Model) openParentDirectory() tea.Cmd {
-	rootPath := filepath.Clean(m.conf.Repository())
+	rootPath := m.rootPath()
 	currentPath := filepath.Clean(m.currentPath)
 
 	if currentPath == rootPath {
