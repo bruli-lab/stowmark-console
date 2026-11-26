@@ -21,7 +21,12 @@ func NewRepositories(session *Session) *Repositories {
 }
 
 func (r *Repositories) Initialized(ctx context.Context) (bool, error) {
-	_, err := r.session.handler.ListSnapshots(ctx)
+	handler, err := r.session.current()
+	if err != nil {
+		return false, err
+	}
+
+	_, err = handler.ListSnapshots(ctx)
 
 	switch {
 	case err == nil:
@@ -34,7 +39,12 @@ func (r *Repositories) Initialized(ctx context.Context) (bool, error) {
 }
 
 func (r *Repositories) Initialize(ctx context.Context, options repository.InitOptions) error {
-	return r.session.handler.InitWithOptions(ctx, stowmark.InitOptions{
+	handler, err := r.session.current()
+	if err != nil {
+		return err
+	}
+
+	return handler.InitWithOptions(ctx, stowmark.InitOptions{
 		Compression: &stowmark.Compression{
 			Type:  options.Compression(),
 			Level: options.CompressionLevel(),

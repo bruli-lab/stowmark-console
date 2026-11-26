@@ -15,10 +15,11 @@ tasks:
       - task --list
 
   run:
-    desc: Start the console against the local sandbox repository
+    desc: Start the console against the sandbox repository and the repositories in sandbox/repositories.yaml
     interactive: true
     env:
       STOWMARK_REPOSITORY: '{{.SANDBOX_DIR}}/repository'
+      STOWMARK_CONSOLE_CONFIG: '{{.SANDBOX_DIR}}/repositories.yaml'
     cmds:
       - go run ./cmd/console
 
@@ -34,6 +35,7 @@ tasks:
         set -euo pipefail
         echo "🧩 Generating mocks with moq..."
         go tool moq -rm -out internal/mocks/repository.go -pkg mocks ./internal/domain/repository Repository:RepositoryMock
+        go tool moq -rm -out internal/mocks/catalog.go -pkg mocks ./internal/domain/repository Catalog:CatalogMock
         go tool moq -rm -out internal/mocks/snapshot_repository.go -pkg mocks ./internal/domain/snapshot Repository:SnapshotRepositoryMock
 
   env:keys:

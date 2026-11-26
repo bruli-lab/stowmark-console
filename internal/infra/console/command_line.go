@@ -49,6 +49,8 @@ func runCommand(command string) tea.Cmd {
 		return tea.Quit
 	case "s", "snap", "snapshots":
 		return emit(snapshotsScreenRequested{})
+	case "repo", "repos", "repositories":
+		return emit(repositoriesScreenRequested{})
 	}
 
 	return emit(statusMessage{text: "Unknown command: " + command})

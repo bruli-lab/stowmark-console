@@ -32,9 +32,31 @@ func (m *Model) finishOperation() {
 	}
 }
 
+func (m *Model) openInitialRepository() tea.Cmd {
+	list := m.handlers.ListRepositories
+	open := m.handlers.OpenRepository
+	return m.startOperation("Opening repository...", func(ctx context.Context) tea.Msg {
+		profiles, err := list.Handle(ctx, app.ListRepositoriesQuery{})
+		if err != nil {
+			return repositoryOpenedMsg{err: err}
+		}
+		name := profiles[0].Name()
+		event, err := open.Handle(ctx, app.OpenRepositoryCommand{Name: name})
+		return repositoryOpenedMsg{profiles: profiles, name: name, event: event, err: err}
+	})
+}
+
+func (m *Model) openRepository(name string) tea.Cmd {
+	handler := m.handlers.OpenRepository
+	return m.startOperation("Opening repository "+name+"...", func(ctx context.Context) tea.Msg {
+		event, err := handler.Handle(ctx, app.OpenRepositoryCommand{Name: name})
+		return repositoryOpenedMsg{name: name, event: event, err: err}
+	})
+}
+
 func (m *Model) checkRepository() tea.Cmd {
 	handler := m.handlers.RepositoryStatus
-	return m.startOperation("Opening repository...", func(ctx context.Context) tea.Msg {
+	return m.startOperation("Checking repository...", func(ctx context.Context) tea.Msg {
 		initialized, err := handler.Handle(ctx, app.RepositoryStatusQuery{})
 		return repositoryStatusMsg{initialized: initialized, err: err}
 	})
@@ -42,7 +64,7 @@ func (m *Model) checkRepository() tea.Cmd {
 
 func (m *Model) initRepository() tea.Cmd {
 	handler := m.handlers.InitRepository
-	options := m.settings.Init
+	options := m.current.Init()
 	return m.startOperation("Initializing repository...", func(ctx context.Context) tea.Msg {
 		event, err := handler.Handle(ctx, app.InitRepositoryCommand{Options: options})
 		return repositoryInitializedMsg{event: event, err: err}

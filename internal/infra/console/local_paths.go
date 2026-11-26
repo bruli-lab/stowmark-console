@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 )
 
 var errPathRequired = errors.New("a path is required")
@@ -48,19 +50,10 @@ func restoreDestinationWarning(destination string) string {
 	return ""
 }
 
-func initRepositoryWarning(repositoryPath string) string {
-	if isNonEmptyDirectory(repositoryPath) {
+func initRepositoryWarning(profile repository.Profile) string {
+	if profile.Local() && isNonEmptyDirectory(profile.Location()) {
 		return "The directory already exists and is not empty."
 	}
 
 	return ""
-}
-
-func repositoryKind(repositoryPath string) string {
-	scheme, _, found := strings.Cut(repositoryPath, "://")
-	if !found || scheme == "" {
-		return "local"
-	}
-
-	return strings.ToLower(scheme)
 }

@@ -6,6 +6,8 @@ import (
 )
 
 type Handlers struct {
+	ListRepositories *ListRepositories
+	OpenRepository   *OpenRepository
 	RepositoryStatus *RepositoryStatus
 	InitRepository   *InitRepository
 	ListSnapshots    *ListSnapshots
@@ -16,8 +18,10 @@ type Handlers struct {
 	RestoreSnapshot  *RestoreSnapshot
 }
 
-func NewHandlers(repositories repository.Repository, snapshots snapshot.Repository) Handlers {
+func NewHandlers(catalog repository.Catalog, repositories repository.Repository, snapshots snapshot.Repository) Handlers {
 	return Handlers{
+		ListRepositories: NewListRepositories(catalog),
+		OpenRepository:   NewOpenRepository(catalog),
 		RepositoryStatus: NewRepositoryStatus(repositories),
 		InitRepository:   NewInitRepository(repositories),
 		ListSnapshots:    NewListSnapshots(snapshots),

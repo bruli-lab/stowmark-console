@@ -6,14 +6,9 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 )
 
-type Settings struct {
-	RepositoryPath string
-	Init           repository.InitOptions
-}
-
 func encryptionSummary(options repository.InitOptions) string {
 	if !options.Encrypted() {
-		return "none (set STOWMARK_PUBLIC_KEY to enable it)"
+		return "none (set a public key to enable it)"
 	}
 
 	return "public key " + *options.PublicKey()

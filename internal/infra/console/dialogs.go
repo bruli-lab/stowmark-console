@@ -144,21 +144,26 @@ func (d *promptDialog) view() string {
 }
 
 func (m *Model) openInitConfirmation() {
+	declineHint := "Quit"
+	if len(m.repositories) > 1 {
+		declineHint = "Choose another repository"
+	}
+
 	var body strings.Builder
 
 	body.WriteString("No Stowmark repository found at:\n")
-	body.WriteString(highlightStyle.Render(m.settings.RepositoryPath))
+	body.WriteString(highlightStyle.Render(m.current.Location()))
 	body.WriteString("\n\nA new repository will be created with:")
-	body.WriteString("\n  Encryption:  " + encryptionSummary(m.settings.Init))
-	body.WriteString("\n  Compression: " + compressionSummary(m.settings.Init))
+	body.WriteString("\n  Encryption:  " + encryptionSummary(m.current.Init()))
+	body.WriteString("\n  Compression: " + compressionSummary(m.current.Init()))
 
 	m.dialog = &confirmDialog{
-		title:     "Initialize repository",
+		title:     "Initialize repository " + m.current.Name(),
 		body:      body.String(),
-		warning:   initRepositoryWarning(m.settings.RepositoryPath),
-		hint:      "[y] Initialize  [n/Esc] Quit",
+		warning:   initRepositoryWarning(m.current),
+		hint:      "[y] Initialize  [n/Esc] " + declineHint,
 		onConfirm: emit(repositoryInitConfirmed{}),
-		onCancel:  tea.Quit,
+		onCancel:  emit(repositoryInitDeclined{}),
 	}
 }
 

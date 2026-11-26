@@ -50,21 +50,35 @@ func runConsole(conf *config.Config) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	session, err := store.Open(ctx, conf.Repository, conf.PrivateKey)
-	if err != nil {
-		return fmt.Errorf("opening repository: %w", err)
-	}
+	session := store.NewSession()
 	defer func() { err = errors.Join(err, session.Close()) }()
 
-	handlers := app.NewHandlers(store.NewRepositories(session), store.NewSnapshots(session))
-	model := console.New(ctx, console.Settings{
-		RepositoryPath: conf.Repository,
-		Init:           repository.NewInitOptions(conf.Compression, conf.CompressionLevel, conf.PublicKey),
-	}, handlers)
+	catalog := store.NewCatalog(session, catalogEntries(conf.Repositories))
+	handlers := app.NewHandlers(catalog, store.NewRepositories(session), store.NewSnapshots(session))
+	model := console.New(ctx, &handlers)
 
 	if _, err := tea.NewProgram(&model).Run(); err != nil {
 		return fmt.Errorf("running console: %w", err)
 	}
 
 	return nil
+}
+
+func catalogEntries(repositories []config.Repository) []store.Entry {
+	entries := make([]store.Entry, len(repositories))
+
+	for i := range repositories {
+		repo := &repositories[i]
+		entries[i] = store.Entry{
+			Profile: repository.NewProfile(
+				repo.Name,
+				repo.URL,
+				repository.NewInitOptions(repo.Compression, repo.CompressionLevel, repo.PublicKey),
+			),
+			PrivateKey:  repo.PrivateKey,
+			Environment: repo.Env,
+		}
+	}
+
+	return entries
 }

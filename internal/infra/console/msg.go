@@ -5,6 +5,13 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
 
+type repositoryOpenedMsg struct {
+	profiles []repository.Profile
+	name     string
+	event    repository.Opened
+	err      error
+}
+
 type repositoryStatusMsg struct {
 	initialized bool
 	err         error

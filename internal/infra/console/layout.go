@@ -14,7 +14,7 @@ const (
 	maxErrorLines     = 3
 )
 
-var menuScreens = []string{"Snapshots", "Files", "Preview"}
+var menuScreens = []string{"Repositories", "Snapshots", "Files", "Preview"}
 
 func (m *Model) View() tea.View {
 	view := tea.NewView(m.render())
@@ -79,8 +79,11 @@ func (m *Model) renderBody() string {
 }
 
 func (m *Model) renderHeader() string {
-	title := titleStyle.Render("STOWMARK") + " " + kindStyle.Render(repositoryKind(m.settings.RepositoryPath))
-	location := m.settings.RepositoryPath
+	title := titleStyle.Render("STOWMARK")
+	if m.current.Name() != "" {
+		title += " " + kindStyle.Render(m.current.Kind()) + " " + highlightStyle.Render(m.current.Name())
+	}
+	location := m.current.Location()
 
 	if current := m.top().location(); current != "" {
 		location += "  ›  " + current

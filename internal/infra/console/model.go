@@ -5,13 +5,15 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/bruli-lab/stowmark-console/internal/app"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
 
 type Model struct {
 	ctx             context.Context
 	handlers        app.Handlers
-	settings        Settings
+	repositories    []repository.Profile
+	current         repository.Profile
 	width           int
 	height          int
 	snapshots       *snapshotsScreen
@@ -25,18 +27,17 @@ type Model struct {
 	err             error
 }
 
-func New(ctx context.Context, settings Settings, handlers app.Handlers) Model {
+func New(ctx context.Context, handlers *app.Handlers) Model {
 	return Model{
 		ctx:       ctx,
-		handlers:  handlers,
-		settings:  settings,
+		handlers:  *handlers,
 		snapshots: newSnapshotsScreen(),
 		loading:   true,
 	}
 }
 
 func (m *Model) Init() tea.Cmd {
-	return m.checkRepository()
+	return m.openInitialRepository()
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -138,6 +139,11 @@ func (m *Model) showManifest(manifest snapshot.Manifest) {
 	}
 
 	m.push(newFilesScreen(manifest))
+}
+
+func (m *Model) showRepositories() {
+	m.screens = []screen{newRepositoriesScreen(m.repositories, m.current.Name())}
+	m.resizeScreens()
 }
 
 func (m *Model) resizeScreens() {

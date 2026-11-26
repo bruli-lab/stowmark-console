@@ -11,6 +11,19 @@ import (
 
 func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
+	case repositoryOpenedMsg:
+		m.finishOperation()
+		if msg.profiles != nil {
+			m.repositories = msg.profiles
+		}
+		if m.fail("open repository "+msg.name, msg.err) {
+			return nil
+		}
+		m.current = msg.event.Profile
+		m.screens = nil
+		m.snapshots.setSnapshots(nil, "")
+		return m.checkRepository()
+
 	case repositoryStatusMsg:
 		m.finishOperation()
 		if m.fail("open repository", msg.err) {

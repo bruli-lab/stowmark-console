@@ -24,7 +24,12 @@ func NewSnapshots(session *Session) *Snapshots {
 }
 
 func (s *Snapshots) List(ctx context.Context) ([]snapshot.Snapshot, error) {
-	summaries, err := s.session.handler.ListSnapshots(ctx)
+	handler, err := s.session.current()
+	if err != nil {
+		return nil, err
+	}
+
+	summaries, err := handler.ListSnapshots(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +44,12 @@ func (s *Snapshots) List(ctx context.Context) ([]snapshot.Snapshot, error) {
 }
 
 func (s *Snapshots) Manifest(ctx context.Context, snapshotID string) (snapshot.Manifest, error) {
-	manifest, err := s.session.handler.GetManifest(ctx, snapshotID)
+	handler, err := s.session.current()
+	if err != nil {
+		return snapshot.Manifest{}, err
+	}
+
+	manifest, err := handler.GetManifest(ctx, snapshotID)
 	if err != nil {
 		return snapshot.Manifest{}, err
 	}
@@ -53,12 +63,17 @@ func (s *Snapshots) Manifest(ctx context.Context, snapshotID string) (snapshot.M
 }
 
 func (s *Snapshots) Create(ctx context.Context, source string) (snapshot.Snapshot, error) {
-	result, err := s.session.handler.CreateSnapshot(ctx, source, nil)
+	handler, err := s.session.current()
 	if err != nil {
 		return snapshot.Snapshot{}, err
 	}
 
-	manifest, err := s.session.handler.GetManifest(ctx, result.ID)
+	result, err := handler.CreateSnapshot(ctx, source, nil)
+	if err != nil {
+		return snapshot.Snapshot{}, err
+	}
+
+	manifest, err := handler.GetManifest(ctx, result.ID)
 	if err != nil {
 		return snapshot.Snapshot{}, err
 	}
@@ -72,7 +87,12 @@ func (s *Snapshots) Create(ctx context.Context, source string) (snapshot.Snapsho
 }
 
 func (s *Snapshots) Verify(ctx context.Context, snapshotID string) ([]snapshot.Failure, error) {
-	result, err := s.session.handler.VerifySnapshot(ctx, snapshotID, nil)
+	handler, err := s.session.current()
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := handler.VerifySnapshot(ctx, snapshotID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +101,12 @@ func (s *Snapshots) Verify(ctx context.Context, snapshotID string) ([]snapshot.F
 }
 
 func (s *Snapshots) Restore(ctx context.Context, snapshotID, destination string) ([]snapshot.Failure, error) {
-	result, err := s.session.handler.RestoreSnapshot(ctx, snapshotID, &destination, nil)
+	handler, err := s.session.current()
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := handler.RestoreSnapshot(ctx, snapshotID, &destination, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,13 +115,18 @@ func (s *Snapshots) Restore(ctx context.Context, snapshotID, destination string)
 }
 
 func (s *Snapshots) FileContent(ctx context.Context, snapshotID, path string, maxSize int64) ([]byte, error) {
+	handler, err := s.session.current()
+	if err != nil {
+		return nil, err
+	}
+
 	directory, err := os.MkdirTemp("", "stowmark-console-preview-*")
 	if err != nil {
 		return nil, fmt.Errorf("create preview directory: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(directory) }()
 
-	if err := s.session.handler.RestoreFile(ctx, snapshotID, path, &directory, nil); err != nil {
+	if err := handler.RestoreFile(ctx, snapshotID, path, &directory, nil); err != nil {
 		return nil, err
 	}
 

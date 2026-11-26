@@ -23,9 +23,13 @@ const snapshotID = "20261126T160034Z-f482b24d"
 
 type harness struct {
 	model        *Model
+	profiles     []repository.Profile
+	catalog      *mocks.CatalogMock
 	repositories *mocks.RepositoryMock
 	snapshots    *mocks.SnapshotRepositoryMock
 }
+
+var errUnreachable = errors.New("unreachable")
 
 func newHarness(t *testing.T, initialized bool) *harness {
 	t.Helper()
@@ -48,13 +52,40 @@ func newHarness(t *testing.T, initialized bool) *harness {
 		},
 		RestoreFunc: func(context.Context, string, string) ([]snapshot.Failure, error) { return nil, nil },
 	}
-	model := New(t.Context(), Settings{
-		RepositoryPath: filepath.Join(t.TempDir(), "repository"),
-		Init:           repository.NewInitOptions("zstd", nil, nil),
-	}, app.NewHandlers(repositories, snapshots))
+	h := &harness{
+		profiles: []repository.Profile{
+			repository.NewProfile("default", filepath.Join(t.TempDir(), "repository"), repository.NewInitOptions("zstd", nil, nil)),
+		},
+		repositories: repositories,
+		snapshots:    snapshots,
+	}
+	h.catalog = &mocks.CatalogMock{
+		ProfilesFunc: func() []repository.Profile { return h.profiles },
+		OpenFunc: func(_ context.Context, name string) (repository.Profile, error) {
+			for _, profile := range h.profiles {
+				if profile.Name() == name && profile.Kind() != "broken" {
+					return profile, nil
+				}
+			}
+			return repository.Profile{}, errUnreachable
+		},
+	}
+	handlers := app.NewHandlers(h.catalog, repositories, snapshots)
+	model := New(t.Context(), &handlers)
 	model.width, model.height = 120, 40
+	h.model = &model
 
-	return &harness{model: &model, repositories: repositories, snapshots: snapshots}
+	return h
+}
+
+func (h *harness) withRepository(name, location string) *harness {
+	h.profiles = append(h.profiles, repository.NewProfile(name, location, repository.NewInitOptions("", nil, nil)))
+	return h
+}
+
+func (h *harness) repositoriesScreen() *repositoriesScreen {
+	screen, _ := h.model.top().(*repositoriesScreen)
+	return screen
 }
 
 func (h *harness) run(cmd tea.Cmd) {
@@ -154,7 +185,7 @@ func TestConsoleStartup(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
 
-		cmd := h.press(runes("n"))
+		_, cmd := h.model.Update(h.press(runes("n"))())
 
 		require.True(t, isQuit(cmd))
 		require.Empty(t, h.repositories.InitializeCalls())
@@ -202,7 +233,7 @@ func TestConsoleStartup(t *testing.T) {
 	Then the error is shown`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true)
-		h.repositories.InitializedFunc = func(context.Context) (bool, error) { return false, errors.New("unreachable") }
+		h.repositories.InitializedFunc = func(context.Context) (bool, error) { return false, errUnreachable }
 
 		h.started()
 
@@ -618,27 +649,114 @@ func TestTruncate(t *testing.T) {
 	})
 }
 
-func TestRepositoryKind(t *testing.T) {
+func TestConsoleRepositories(t *testing.T) {
 	t.Parallel()
 
-	tests := map[string]string{
-		"/home/user/backups":                    "local",
-		"relative/backups":                      "local",
-		"ssh://stowmark@localhost:12222/backup": "ssh",
-		"S3://bucket/backups":                   "s3",
-		"webdavs://dav.example.com/backups":     "webdavs",
-		"gcs://bucket/backups":                  "gcs",
-	}
+	t.Run(`Given several configured repositories
+	When the console starts
+	Then the first one is opened and shown in the header`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).withRepository("nas", "smb://user@nas/backups").started()
 
-	for repositoryPath, expected := range tests {
-		t.Run(`Given the repository "`+repositoryPath+`"
-		When its kind is shown
-		Then it is "`+expected+`"`, func(t *testing.T) {
-			t.Parallel()
+		require.Equal(t, "default", h.catalog.OpenCalls()[0].Name)
+		require.Equal(t, "default", h.model.current.Name())
+		require.Contains(t, h.view(), "default")
+	})
 
-			require.Equal(t, expected, repositoryKind(repositoryPath))
-		})
-	}
+	t.Run(`Given no configured repositories
+	When the console starts
+	Then the error is shown`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true)
+		h.profiles = nil
+
+		h.started()
+
+		require.ErrorIs(t, h.model.err, app.ErrNoRepositories)
+		require.Empty(t, h.catalog.OpenCalls())
+	})
+
+	t.Run(`Given the snapshots list
+	When the user enters the repositories command
+	Then the configured repositories are listed with the current one selected`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).withRepository("nas", "smb://user@nas/backups").started()
+		h.pressAndRun(runes(":"))
+		h.typeText("repo")
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.NotNil(t, h.repositoriesScreen())
+		selected, _ := h.repositoriesScreen().selected()
+		require.Equal(t, "default", selected.Name())
+		require.Contains(t, h.view(), "smb")
+	})
+
+	t.Run(`Given the repositories list
+	When the user opens another repository
+	Then it becomes the current one and its snapshots are listed`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).withRepository("nas", "smb://user@nas/backups").started()
+		h.pressAndRun(runes(":"))
+		h.typeText("repo")
+		h.pressAndRun(key(tea.KeyEnter))
+		h.pressAndRun(runes("j"))
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Equal(t, "nas", h.catalog.OpenCalls()[1].Name)
+		require.Equal(t, "nas", h.model.current.Name())
+		require.Equal(t, h.model.snapshots, h.model.top())
+		require.Len(t, h.repositories.InitializedCalls(), 2)
+		require.Len(t, h.snapshots.ListCalls(), 2)
+	})
+
+	t.Run(`Given the repositories list
+	When the repository chosen cannot be opened
+	Then the error is shown and the current repository is kept`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).withRepository("nas", "broken://nas").started()
+		h.pressAndRun(runes(":"))
+		h.typeText("repo")
+		h.pressAndRun(key(tea.KeyEnter))
+		h.pressAndRun(runes("j"))
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.ErrorIs(t, h.model.err, errUnreachable)
+		require.Equal(t, "default", h.model.current.Name())
+		require.NotNil(t, h.repositoriesScreen())
+	})
+
+	t.Run(`Given the repositories list
+	When the user goes back
+	Then the snapshots of the current repository are shown`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).withRepository("nas", "smb://user@nas/backups").started()
+		h.pressAndRun(runes(":"))
+		h.typeText("repo")
+		h.pressAndRun(key(tea.KeyEnter))
+
+		h.pressAndRun(key(tea.KeyEsc))
+
+		require.Equal(t, h.model.snapshots, h.model.top())
+		require.Len(t, h.catalog.OpenCalls(), 1)
+	})
+
+	t.Run(`Given several repositories and one that is not initialized
+	When the user declines to initialize it
+	Then the repositories list is shown instead of quitting`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, false).withRepository("nas", "smb://user@nas/backups").started()
+
+		cmd := h.press(runes("n"))
+		require.False(t, isQuit(cmd))
+		h.run(cmd)
+
+		require.NotNil(t, h.repositoriesScreen())
+		require.Contains(t, h.model.message, "not initialized")
+		require.Empty(t, h.repositories.InitializeCalls())
+	})
 }
 
 func TestFitColumns(t *testing.T) {

@@ -5,6 +5,14 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
 
+type repositoryOpenRequested struct {
+	name string
+}
+
+type repositoriesScreenRequested struct{}
+
+type repositoryInitDeclined struct{}
+
 type snapshotOpenRequested struct {
 	snapshotID string
 }
@@ -67,6 +75,14 @@ func (m *Model) handleIntent(msg tea.Msg) (tea.Cmd, bool) {
 		m.pop()
 	case snapshotsScreenRequested:
 		m.screens = nil
+	case repositoriesScreenRequested:
+		m.showRepositories()
+	case repositoryInitDeclined:
+		if len(m.repositories) < 2 {
+			return tea.Quit, true
+		}
+		m.message = "Repository " + m.current.Name() + " was not initialized"
+		m.showRepositories()
 	case statusMessage:
 		m.err = nil
 		m.message = msg.text
@@ -89,6 +105,8 @@ func (m *Model) handleOperationIntent(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case repositoryInitConfirmed:
 		start = m.initRepository
+	case repositoryOpenRequested:
+		start = func() tea.Cmd { return m.openRepository(msg.name) }
 	case snapshotsRefreshRequested:
 		start = func() tea.Cmd { return m.loadSnapshots(msg.selectID) }
 	case snapshotOpenRequested:

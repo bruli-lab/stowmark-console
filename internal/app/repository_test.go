@@ -75,3 +75,79 @@ func TestInitRepository(t *testing.T) {
 		require.ErrorIs(t, err, errBackend)
 	})
 }
+
+func TestListRepositories(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given a catalog with profiles
+	When the repositories are listed
+	Then the profiles are returned in order`, func(t *testing.T) {
+		t.Parallel()
+		profiles := []repository.Profile{
+			repository.NewProfile("local", "/backups", repository.NewInitOptions("", nil, nil)),
+			repository.NewProfile("nas", "smb://user@nas/backups", repository.NewInitOptions("", nil, nil)),
+		}
+		catalog := &mocks.CatalogMock{ProfilesFunc: func() []repository.Profile { return profiles }}
+
+		listed, err := app.NewListRepositories(catalog).Handle(t.Context(), app.ListRepositoriesQuery{})
+
+		require.NoError(t, err)
+		require.Equal(t, profiles, listed)
+	})
+
+	t.Run(`Given an empty catalog
+	When the repositories are listed
+	Then it returns an error`, func(t *testing.T) {
+		t.Parallel()
+		catalog := &mocks.CatalogMock{ProfilesFunc: func() []repository.Profile { return nil }}
+
+		_, err := app.NewListRepositories(catalog).Handle(t.Context(), app.ListRepositoriesQuery{})
+
+		require.ErrorIs(t, err, app.ErrNoRepositories)
+	})
+}
+
+func TestOpenRepository(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given a repository name
+	When the repository is opened
+	Then an opened event with its profile is returned`, func(t *testing.T) {
+		t.Parallel()
+		profile := repository.NewProfile("nas", "smb://user@nas/backups", repository.NewInitOptions("", nil, nil))
+		catalog := &mocks.CatalogMock{
+			OpenFunc: func(context.Context, string) (repository.Profile, error) { return profile, nil },
+		}
+
+		event, err := app.NewOpenRepository(catalog).Handle(t.Context(), app.OpenRepositoryCommand{Name: "nas"})
+
+		require.NoError(t, err)
+		require.Equal(t, profile, event.Profile)
+		require.Equal(t, "nas", catalog.OpenCalls()[0].Name)
+	})
+
+	t.Run(`Given an empty repository name
+	When the repository is opened
+	Then it returns an error without touching the catalog`, func(t *testing.T) {
+		t.Parallel()
+		catalog := &mocks.CatalogMock{}
+
+		_, err := app.NewOpenRepository(catalog).Handle(t.Context(), app.OpenRepositoryCommand{})
+
+		require.ErrorIs(t, err, app.ErrRepositoryNameRequired)
+		require.Empty(t, catalog.OpenCalls())
+	})
+
+	t.Run(`Given a repository that cannot be opened
+	When the repository is opened
+	Then the error is returned`, func(t *testing.T) {
+		t.Parallel()
+		catalog := &mocks.CatalogMock{
+			OpenFunc: func(context.Context, string) (repository.Profile, error) { return repository.Profile{}, errBackend },
+		}
+
+		_, err := app.NewOpenRepository(catalog).Handle(t.Context(), app.OpenRepositoryCommand{Name: "nas"})
+
+		require.ErrorIs(t, err, errBackend)
+	})
+}

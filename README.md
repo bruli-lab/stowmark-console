@@ -70,7 +70,9 @@ You can also set the variable for a single invocation:
 STOWMARK_REPOSITORY="$HOME/backups/stowmark" stowmark_console
 ```
 
-If the path does not contain a Stowmark repository yet, the console asks for confirmation before initializing one there. Declining quits without touching the disk.
+To work with several repositories, list them in a repositories file (see [Several repositories](#several-repositories)) and switch between them with `:repo`.
+
+If the path does not contain a Stowmark repository yet, the console asks for confirmation before initializing one there. Declining quits without touching the disk, or goes back to the repositories list when several are configured.
 
 While the console is running, Stowmark log output is written to a log file (see `STOWMARK_CONSOLE_LOG_FILE`) so it does not corrupt the screen.
 
@@ -88,18 +90,53 @@ While the console is running, Stowmark log output is written to a log file (see 
 
 See the [Stowmark documentation](https://github.com/bruli-lab/stowmark) for every option. Snapshot sources and restore destinations are always local directories.
 
+### Several repositories
+
+The console reads a YAML file with the repositories to choose from, `~/.config/stowmark-console/repositories.yaml` by default (`STOWMARK_CONSOLE_CONFIG` changes the path). Each repository has its own initialization options and credentials:
+
+```yaml
+repositories:
+  - name: laptop
+    url: ~/backups/stowmark
+    compression: zstd
+    compression_level: 3
+  - name: nas
+    url: smb://pablo@nas:445/backups/stowmark
+    env:
+      STOWMARK_SMB_PASSWORD: secret
+  - name: cloud
+    url: s3://my-bucket/stowmark
+    private_key: ~/.config/stowmark/private.key
+    public_key: ~/.config/stowmark/public.key
+    env:
+      AWS_ACCESS_KEY_ID: AKIA...
+      AWS_SECRET_ACCESS_KEY: ...
+      AWS_REGION: eu-west-1
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `name` | yes | Unique name shown in the repositories list |
+| `url` | yes | Path or URL of the repository (`~` is expanded for local paths) |
+| `private_key`, `public_key` | no | Same as `STOWMARK_PRIVATE_KEY` and `STOWMARK_PUBLIC_KEY` |
+| `compression`, `compression_level` | no | Same as `STOWMARK_COMPRESSION` and `STOWMARK_COMPRESSION_LEVEL` |
+| `env` | no | Environment variables set while the repository is open, such as the credentials of a remote backend |
+
+When `STOWMARK_REPOSITORY` is set, it is added first as the `default` repository with the options of the environment variables. The console opens the first repository on start. `:repo` lists them all, marks the current one and opens the selected one: its `env` variables replace those of the previous repository. Keep the file readable only by you (`chmod 600`) when it holds credentials.
+
 ### Configuration
 
-The console is configured with environment variables:
+The console is configured with environment variables. At least one repository must be configured, either with `STOWMARK_REPOSITORY` or in the repositories file:
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `STOWMARK_REPOSITORY` | yes | | Path (or URL) of the Stowmark repository |
+| `STOWMARK_REPOSITORY` | no | | Path (or URL) of the `default` Stowmark repository |
 | `STOWMARK_PRIVATE_KEY` | no | | Private key used to create, verify and restore snapshots of an encrypted repository |
 | `STOWMARK_PUBLIC_KEY` | no | | Public key used to encrypt a repository when it is initialized |
 | `STOWMARK_COMPRESSION` | no | `none` | Compression of a new repository: `none`, `zstd`, `lz4`, `xz` or `gzip` |
 | `STOWMARK_COMPRESSION_LEVEL` | no | | Compression level of a new repository |
 | `STOWMARK_CONSOLE_LOG_FILE` | no | `~/.cache/stowmark-console/console.log` | File that receives Stowmark log output |
+| `STOWMARK_CONSOLE_CONFIG` | no | `~/.config/stowmark-console/repositories.yaml` | Repositories file |
 
 The initialization options only apply when the console creates a new repository, and they are shown in the confirmation dialog. Variables read by Stowmark itself, such as `STOWMARK_LOG_LEVEL`, are honored as well.
 
@@ -151,6 +188,7 @@ Press `:` in any view, type a command and press `Enter`. `Esc` closes the comman
 | --- | --- |
 | `:q`, `:quit` | Exit |
 | `:snap`, `:snapshots`, `:s` | Go back to the snapshots list |
+| `:repo`, `:repos`, `:repositories` | List the configured repositories and switch to another one |
 
 ### Creating and restoring
 
