@@ -2,7 +2,6 @@ package console
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,15 +25,28 @@ func resolveLocalPath(raw string) (string, error) {
 		return "", errPathRequired
 	}
 
-	if raw == "~" || strings.HasPrefix(raw, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("resolve home directory: %w", err)
-		}
-		raw = filepath.Join(home, strings.TrimPrefix(raw, "~"))
+	return filepath.Abs(expandHome(raw))
+}
+
+func expandHome(raw string) string {
+	if raw != "~" && !strings.HasPrefix(raw, "~/") {
+		return raw
 	}
 
-	return filepath.Abs(raw)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return raw
+	}
+
+	return filepath.Join(home, strings.TrimPrefix(raw, "~")) + trailingSeparator(raw)
+}
+
+func trailingSeparator(raw string) string {
+	if strings.HasSuffix(raw, "/") && raw != "~/" {
+		return "/"
+	}
+
+	return ""
 }
 
 func isNonEmptyDirectory(path string) bool {

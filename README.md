@@ -192,7 +192,7 @@ Press `:` in any view, type a command and press `Enter`. `Esc` closes the comman
 
 ### Creating and restoring
 
-Creating a snapshot opens a small form for the source directory.
+Creating a snapshot opens a form for the origin directory, prefilled with the source of the selected snapshot. While you type, it suggests the subdirectories of the path and the origins of earlier snapshots: `Tab` accepts the highlighted suggestion and `↑`/`↓` move between them. The form tells you whether the path is an existing directory and only accepts directories.
 
 Restoring asks for a destination directory first. It defaults to `~/stowmark-restore/<snapshot-id>`, never to the original source. The confirmation shows the destination and warns when it already contains files, which would be overwritten. Only `y` confirms the restore.
 

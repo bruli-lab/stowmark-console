@@ -57,6 +57,14 @@ func truncate(value string, width int) string {
 	return ansi.Truncate(value, max(0, width), "…")
 }
 
+func truncateLeft(value string, width int) string {
+	if ansi.StringWidth(value) <= width {
+		return value
+	}
+
+	return "…" + ansi.TruncateLeft(value, ansi.StringWidth(value)-width+1, "")
+}
+
 func padLeft(value string, width int) string {
 	value = truncate(value, width)
 	return strings.Repeat(" ", max(0, width-ansi.StringWidth(value))) + value

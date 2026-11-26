@@ -113,6 +113,10 @@ func (h *harness) typeText(value string) {
 	}
 }
 
+func (h *harness) clearInput() {
+	h.pressAndRun(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+}
+
 func (h *harness) started() *harness {
 	h.run(h.model.Init())
 	return h
@@ -442,6 +446,7 @@ func TestConsoleOperations(t *testing.T) {
 			return []snapshot.Snapshot{fixtures.Snapshot().WithID(snapshotID).Build(), created}, nil
 		}
 		h.pressAndRun(runes("c"))
+		h.clearInput()
 		h.typeText(source)
 
 		h.pressAndRun(key(tea.KeyEnter))
@@ -503,6 +508,7 @@ func TestConsoleDialogsAndCommands(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
 		h.pressAndRun(runes("c"))
+		h.clearInput()
 
 		h.typeText("my")
 		h.pressAndRun(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
@@ -517,6 +523,7 @@ func TestConsoleDialogsAndCommands(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
 		h.pressAndRun(runes("c"))
+		h.clearInput()
 
 		h.pressAndRun(key(tea.KeyEnter))
 
@@ -589,6 +596,99 @@ func TestConsoleDialogsAndCommands(t *testing.T) {
 		h.pressAndRun(key(tea.KeyBackspace))
 
 		require.Nil(t, h.model.command)
+	})
+}
+
+func TestConsoleCreateForm(t *testing.T) {
+	t.Parallel()
+
+	newSource := func(t *testing.T) string {
+		t.Helper()
+		source := t.TempDir()
+		for _, directory := range []string{"alpha", "beta", ".hidden"} {
+			require.NoError(t, os.Mkdir(filepath.Join(source, directory), 0o700))
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(source, "file.txt"), []byte("data"), 0o600))
+		return source
+	}
+
+	t.Run(`Given a selected snapshot
+	When the user opens the create form
+	Then the origin is prefilled with the source of the snapshot`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+
+		h.pressAndRun(runes("c"))
+
+		require.Equal(t, "/home/user/documents", h.prompt().input.Value())
+	})
+
+	t.Run(`Given the create form with the prefix of a directory
+	When the user presses tab
+	Then the directory is completed and its status is shown`, func(t *testing.T) {
+		t.Parallel()
+		source := newSource(t)
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes("c"))
+		h.clearInput()
+		h.typeText(source + "/al")
+
+		h.pressAndRun(key(tea.KeyTab))
+
+		require.Equal(t, source+"/alpha/", h.prompt().input.Value())
+		require.Contains(t, h.view(), "Directory with 0 entries")
+	})
+
+	t.Run(`Given the create form with a directory that does not exist
+	When the user submits it
+	Then an error is shown and nothing is created`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes("c"))
+		h.clearInput()
+		h.typeText(filepath.Join(t.TempDir(), "missing"))
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.True(t, h.prompt().invalid)
+		require.Equal(t, errDirectoryNotFound.Error(), h.prompt().err)
+		require.Empty(t, h.snapshots.CreateCalls())
+	})
+
+	t.Run(`Given the create form with a file instead of a directory
+	When the value is checked
+	Then it is reported as not a directory`, func(t *testing.T) {
+		t.Parallel()
+		source := newSource(t)
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes("c"))
+		h.clearInput()
+
+		h.typeText(filepath.Join(source, "file.txt"))
+
+		require.Equal(t, errNotADirectory.Error(), h.prompt().status)
+	})
+
+	t.Run(`Given a directory with subdirectories, hidden ones and files
+	When the suggestions for it are computed
+	Then the visible subdirectories and the known origins are suggested`, func(t *testing.T) {
+		t.Parallel()
+		source := newSource(t)
+
+		suggestions := pathSuggestions(source+"/", []string{"/known"})
+
+		require.ElementsMatch(t, []string{"/known", source + "/alpha/", source + "/beta/"}, suggestions)
+	})
+
+	t.Run(`Given a prefix that starts with a dot
+	When the suggestions are computed
+	Then hidden directories are suggested too`, func(t *testing.T) {
+		t.Parallel()
+		source := newSource(t)
+
+		suggestions := pathSuggestions(source+"/.h", nil)
+
+		require.Contains(t, suggestions, source+"/.hidden/")
 	})
 }
 
@@ -818,5 +918,22 @@ func TestFitColumns(t *testing.T) {
 		columns := fitColumns(snapshotColumns, 60)
 
 		require.Equal(t, []int{19, 26, 7, 0, 0}, widths(columns))
+	})
+}
+
+func TestKnownOrigins(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given snapshots that share a source
+	When the known origins are computed
+	Then each source appears once as a directory`, func(t *testing.T) {
+		t.Parallel()
+		snapshots := []snapshot.Snapshot{
+			fixtures.Snapshot().WithSource("/data").Build(),
+			fixtures.Snapshot().WithSource("/data/").Build(),
+			fixtures.Snapshot().WithSource("/home").Build(),
+		}
+
+		require.Equal(t, []string{"/data/", "/home/"}, knownOrigins(snapshots))
 	})
 }

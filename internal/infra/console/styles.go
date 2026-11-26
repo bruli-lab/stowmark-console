@@ -12,6 +12,7 @@ var (
 	colorSurface   = lipgloss.Color("#181825")
 	colorSelected  = lipgloss.Color("#313244")
 	colorError     = lipgloss.Color("#F38BA8")
+	colorSuccess   = lipgloss.Color("#A6E3A1")
 
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -105,11 +106,14 @@ var (
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(colorPrimary).
 			Padding(1, 2).
-			Width(64)
+			Width(76)
 
 	inputStyle = lipgloss.NewStyle().
 			Foreground(colorText).
 			Background(colorSelected).
 			Padding(0, 1).
-			Width(56)
+			Width(68)
+
+	successStyle = lipgloss.NewStyle().
+			Foreground(colorSuccess)
 )
