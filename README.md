@@ -5,18 +5,20 @@
 [![License](https://img.shields.io/github/license/bruli-lab/stowmark-console)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/bruli-lab/stowmark-console)](go.mod)
 
-A terminal user interface for browsing and managing local [Stowmark](https://github.com/bruli-lab/stowmark) snapshot repositories.
+A terminal user interface for browsing and managing [Stowmark](https://github.com/bruli-lab/stowmark) snapshot repositories.
 
-Stowmark Console provides a compact, keyboard-driven interface for inspecting repository contents, previewing text files, creating snapshots, verifying their integrity, and restoring them.
+Stowmark Console provides a compact, keyboard-driven interface for listing snapshots, browsing the files they contain, previewing text files, creating snapshots, verifying their integrity, and restoring them.
 
 ## Features
 
-- Browse a Stowmark repository without leaving the terminal
+- List the snapshots of a Stowmark repository, newest first
+- Browse the files of a snapshot by directory, straight from its manifest
 - Offer to initialize the repository when it does not exist
-- Preview text files with line numbers and scrolling
+- Preview text files stored in a snapshot with line numbers and scrolling
 - Create snapshots from a selected source directory
 - Verify the integrity of a snapshot
 - Restore a snapshot to a chosen destination after an explicit confirmation
+- Cancel a running operation with `Esc`
 - Navigate using arrow keys or Vim-style key bindings
 
 > [!NOTE]
@@ -90,32 +92,58 @@ The initialization options only apply when the console creates a new repository,
 
 ## Keyboard controls
 
-### Repository browser
+### Snapshots
 
 | Key | Action |
 | --- | --- |
-| `↑` / `k` | Select the previous entry |
-| `↓` / `j` | Select the next entry |
-| `Enter` | Open a directory or preview a file |
-| `Backspace` / `Esc` / `←` / `h` | Go to the parent directory |
-| `r` | Refresh the current directory |
-| `g` / `Home` | Select the first entry |
-| `G` / `End` | Select the last entry |
-| `:q` / `Ctrl+C` | Exit |
-
-### Snapshot directory
-
-The following actions are available while browsing the repository's `snapshots` directory:
-
-| Key | Action |
-| --- | --- |
+| `↑` / `k`, `↓` / `j` | Select the previous or next snapshot |
+| `g` / `Home`, `G` / `End` | Select the first or last snapshot |
+| `Enter` / `→` / `l` | Browse the files of the selected snapshot |
 | `c` | Create a snapshot |
 | `v` | Verify the selected snapshot |
 | `x` | Restore the selected snapshot |
+| `r` | Refresh the list |
+| `:q` / `Ctrl+C` | Exit |
+
+### Files of a snapshot
+
+| Key | Action |
+| --- | --- |
+| `↑` / `k`, `↓` / `j` | Select the previous or next entry |
+| `Enter` / `→` / `l` | Open a directory or preview a text file |
+| `Esc` / `Backspace` / `←` / `h` | Go to the parent directory, or back to the snapshots |
+| `v` / `x` | Verify or restore the snapshot being browsed |
+| `c` | Create a snapshot |
+| `r` | Reload the snapshot |
+
+### File preview
+
+| Key | Action |
+| --- | --- |
+| `↑` / `k`, `↓` / `j` | Scroll one line |
+| `PgUp`, `PgDown` / `Space` | Scroll one page |
+| `g` / `Home`, `G` / `End` | Go to the top or the bottom |
+| `Esc` / `q` | Close the preview |
+
+Previews read at most the first 1 MiB of a file from the snapshot.
+
+### Creating and restoring
 
 Creating a snapshot opens a small form for the source directory.
 
 Restoring asks for a destination directory first. It defaults to `~/stowmark-restore/<snapshot-id>`, never to the original source. The confirmation shows the destination and warns when it already contains files, which would be overwritten. Only `y` confirms the restore.
+
+While an operation is running, `Esc` cancels it.
+
+## Architecture
+
+The project follows a hexagonal architecture:
+
+- `internal/domain`: entities, value objects, events and ports (`repository`, `snapshot`).
+- `internal/app`: one query or command handler per use case (CQS). Commands return domain events.
+- `internal/infra/store`: adapter that implements the ports on top of the Stowmark library, with a single handler per session.
+- `internal/infra/console`: the terminal user interface, which only talks to the application layer.
+- `internal/config`, `internal/fixtures`, `internal/mocks`: configuration, test data builders and moq mocks.
 
 ## Development
 

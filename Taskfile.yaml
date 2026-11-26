@@ -8,12 +8,12 @@ silent: false
 
 tasks:
   default:
-    desc: Mostra l'ajuda
+    desc: Show the available tasks
     cmds:
       - task --list
 
   run:
-    desc: Arrancar la consola amb el repositori local del sandbox
+    desc: Start the console against the local sandbox repository
     interactive: true
     env:
       STOWMARK_REPOSITORY: '{{.SANDBOX_DIR}}/repository'
@@ -21,20 +21,21 @@ tasks:
       - go run ./cmd/console
 
   build:
-    desc: Compilar el binari a bin/
+    desc: Build the binary into bin/
     cmds:
       - go build -o bin/stowmark_console ./cmd/console
 
   mocks:
-    desc: Generar els mocks de les interfícies amb moq
+    desc: Generate the interface mocks with moq
     cmds:
       - |
         set -euo pipefail
         echo "🧩 Generating mocks with moq..."
-        go tool moq -rm -out internal/domain/repository/folder_repository_mock_test.go -pkg repository_test ./internal/domain/repository FolderRepository
+        go tool moq -rm -out internal/mocks/repository.go -pkg mocks ./internal/domain/repository Repository:RepositoryMock
+        go tool moq -rm -out internal/mocks/snapshot_repository.go -pkg mocks ./internal/domain/snapshot Repository:SnapshotRepositoryMock
 
   fmt:
-    desc: Format Go amb gofumpt
+    desc: Format the code with gofumpt
     cmds:
       - |
         set -euo pipefail
@@ -42,7 +43,7 @@ tasks:
         go tool gofumpt -w .
 
   fix:
-    desc: fixing code
+    desc: Apply go fix to the code
     cmds:
       - |
         set -euo pipefail
@@ -50,7 +51,7 @@ tasks:
         go fix -v ./...
 
   security:
-    desc: Revisar vulnerabilitats amb govulncheck
+    desc: Check for vulnerabilities with govulncheck
     cmds:
       - |
         set -euo pipefail
@@ -58,7 +59,7 @@ tasks:
         go tool govulncheck ./...
 
   install-lint:
-    desc: Instal·lar golangci-lint
+    desc: Install golangci-lint
     cmds:
       - |
         set -euo pipefail
@@ -66,7 +67,7 @@ tasks:
         go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
 
   lint:
-    desc: Executing golangci-lint
+    desc: Run golangci-lint
     deps:
       - install-lint
     cmds:
@@ -76,7 +77,7 @@ tasks:
         golangci-lint run ./...
 
   test:
-    desc: Executing tests amb race, coverage i tparse
+    desc: Run the tests with race detector and coverage, reported with tparse
     cmds:
       - |
         set -euo pipefail
@@ -84,7 +85,7 @@ tasks:
         go test -race ./... -json -cover -coverprofile=coverage.out | go tool tparse -all
 
   check:
-    desc: Executing fmt, fix, security, lint i test en ordre
+    desc: Run fmt, fix, security, lint and test in order
     cmds:
       - task: fmt
       - task: fix

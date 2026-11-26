@@ -69,6 +69,9 @@ var (
 			Background(colorSurface).
 			Padding(0, 1)
 
+	mutedStyle = lipgloss.NewStyle().
+			Foreground(colorMuted)
+
 	highlightStyle = lipgloss.NewStyle().
 			Foreground(colorSecondary).
 			Bold(true)

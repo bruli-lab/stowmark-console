@@ -3,48 +3,26 @@ package console
 import (
 	"fmt"
 
-	"github.com/bruli-lab/stowmark/pkg/stowmark"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 )
 
 type Settings struct {
 	RepositoryPath string
-	PrivateKey     *string
-	Init           InitSettings
+	Init           repository.InitOptions
 }
 
-type InitSettings struct {
-	PublicKey        *string
-	Compression      string
-	CompressionLevel *int
-}
-
-func (s InitSettings) options() stowmark.InitOptions {
-	return stowmark.InitOptions{
-		Compression: &stowmark.Compression{Type: s.compressionType(), Level: s.CompressionLevel},
-		PublicKey:   s.PublicKey,
-	}
-}
-
-func (s InitSettings) compressionType() string {
-	if s.Compression == "" {
-		return "none"
-	}
-
-	return s.Compression
-}
-
-func (s InitSettings) encryptionSummary() string {
-	if s.PublicKey == nil {
+func encryptionSummary(options repository.InitOptions) string {
+	if !options.Encrypted() {
 		return "none (set STOWMARK_PUBLIC_KEY to enable it)"
 	}
 
-	return "public key " + *s.PublicKey
+	return "public key " + *options.PublicKey()
 }
 
-func (s InitSettings) compressionSummary() string {
-	if s.CompressionLevel == nil {
-		return s.compressionType()
+func compressionSummary(options repository.InitOptions) string {
+	if options.CompressionLevel() == nil {
+		return options.Compression()
 	}
 
-	return fmt.Sprintf("%s (level %d)", s.compressionType(), *s.CompressionLevel)
+	return fmt.Sprintf("%s (level %d)", options.Compression(), *options.CompressionLevel())
 }

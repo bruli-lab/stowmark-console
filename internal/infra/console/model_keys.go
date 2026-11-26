@@ -19,12 +19,23 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "ctrl+c":
 		return m, tea.Quit
 	case m.loading:
-		return m, nil
-	case m.previewing:
+		return m.handleLoadingKey(msg)
+	case m.preview != nil:
 		return m.handlePreviewKey(msg)
+	case m.view == filesView:
+		return m.handleFilesKey(msg)
 	default:
-		return m.handleBrowserKey(msg)
+		return m.handleSnapshotsKey(msg)
 	}
+}
+
+func (m *Model) handleLoadingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.Type == tea.KeyEsc && m.cancelOperation != nil {
+		m.cancelOperation()
+		m.message = "Cancelling..."
+	}
+
+	return m, nil
 }
 
 func (m *Model) handleInitConfirmationKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -32,10 +43,8 @@ func (m *Model) handleInitConfirmationKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "y", "Y":
 		m.confirmingInit = false
 		m.initWarning = ""
-		m.loading = true
-		m.message = "Initializing repository..."
-
-		return m, initRepositoryCmd(m.ctx, m.repoPath, m.initSettings)
+		cmd := m.initRepository()
+		return m, cmd
 
 	case "n", "N", "esc", "q", "ctrl+c":
 		return m, tea.Quit
@@ -51,18 +60,16 @@ func (m *Model) handleSnapshotFormKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = "Snapshot creation cancelled"
 
 	case promptSubmitted:
-		origin, err := resolveLocalPath(m.snapshotForm.trimmedValue())
+		source, err := resolveLocalPath(m.snapshotForm.trimmedValue())
 		if err != nil {
 			m.snapshotForm.fail("Origin is required")
 			return m, nil
 		}
 
 		m.snapshotForm = nil
-		m.loading = true
-		m.err = nil
-		m.message = "Creating snapshot..."
 
-		return m, createSnapshotCmd(m.ctx, m.repoPath, origin, m.privateKey)
+		cmd := m.createSnapshot(source)
+		return m, cmd
 
 	case promptEditing:
 	}
@@ -99,17 +106,9 @@ func (m *Model) handleRestoreConfirmationKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	case "y", "Y":
 		request := *m.restore
 		m.restore = nil
-		m.loading = true
-		m.err = nil
-		m.message = "Restoring snapshot..."
 
-		return m, restoreSnapshotCmd(
-			m.ctx,
-			m.repoPath,
-			request.snapshotID,
-			request.destination,
-			m.privateKey,
-		)
+		cmd := m.restoreSnapshot(request)
+		return m, cmd
 
 	case "n", "N", "esc", "q", "ctrl+c":
 		m.restore = nil
@@ -154,11 +153,8 @@ func (m *Model) handleCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handlePreviewKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "backspace":
-		m.previewing = false
-		m.previewPath = ""
-		m.previewLines = nil
-		m.previewOffset = 0
+	case "esc", "backspace", "q":
+		m.preview = nil
 		m.err = nil
 
 	case ":":
@@ -166,62 +162,116 @@ func (m *Model) handlePreviewKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commandInput = ""
 
 	case "up", "k":
-		if m.previewOffset > 0 {
-			m.previewOffset--
-		}
+		m.preview.offset = max(0, m.preview.offset-1)
 
 	case "down", "j":
-		if m.previewOffset < m.maxPreviewOffset() {
-			m.previewOffset++
-		}
+		m.preview.offset = min(m.maxPreviewOffset(), m.preview.offset+1)
+
+	case "pgup":
+		m.preview.offset = max(0, m.preview.offset-m.previewVisibleLines())
+
+	case "pgdown", " ":
+		m.preview.offset = min(m.maxPreviewOffset(), m.preview.offset+m.previewVisibleLines())
 
 	case "home", "g":
-		m.previewOffset = 0
+		m.preview.offset = 0
 
 	case "end", "G":
-		m.previewOffset = m.maxPreviewOffset()
+		m.preview.offset = m.maxPreviewOffset()
 	}
 
 	return m, nil
 }
 
-func (m *Model) maxPreviewOffset() int {
-	return max(0, len(m.previewLines)-m.previewVisibleLines())
+func (m *Model) handleSnapshotsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if cmd, handled := m.handleSnapshotActionKey(msg); handled {
+		return m, cmd
+	}
+
+	switch msg.String() {
+	case "enter", "right", "l":
+		selected, ok := m.selectedSnapshot()
+		if !ok {
+			return m, nil
+		}
+		cmd := m.openSnapshot(selected.ID())
+		return m, cmd
+
+	case "r":
+		selected, _ := m.selectedSnapshot()
+		cmd := m.loadSnapshots(selected.ID())
+		return m, cmd
+
+	default:
+		m.snapshotCursor = moveCursor(msg.String(), m.snapshotCursor, len(m.snapshots), m.contentHeight())
+	}
+
+	return m, nil
 }
 
-func (m *Model) handleBrowserKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleFilesKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if cmd, handled := m.handleSnapshotActionKey(msg); handled {
+		return m, cmd
+	}
+
+	switch msg.String() {
+	case "enter", "right", "l":
+		entry, ok := m.selectedEntry()
+		if !ok {
+			return m, nil
+		}
+		if entry.IsDir() {
+			m.enterSelectedEntry()
+			return m, nil
+		}
+		file, found := m.manifest.FileAt(m.directory, entry.Name())
+		if !found {
+			return m, nil
+		}
+		cmd := m.loadFileContent(m.manifest.SnapshotID(), entry.Name(), file)
+		return m, cmd
+
+	case "esc", "backspace", "left", "h":
+		m.err = nil
+		m.message = ""
+		m.leaveDirectory()
+
+	case "r":
+		cmd := m.openSnapshot(m.manifest.SnapshotID())
+		return m, cmd
+
+	default:
+		m.fileCursor = moveCursor(msg.String(), m.fileCursor, len(m.entries), m.contentHeight())
+	}
+
+	return m, nil
+}
+
+func (m *Model) handleSnapshotActionKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.String() {
 	case ":":
 		m.commandMode = true
 		m.commandInput = ""
+		return nil, true
 
 	case "c":
-		if !m.isSnapshotsDirectory() {
-			return m, nil
-		}
-
 		m.snapshotForm = newTextPrompt("Create snapshot", "Origin", "")
 		m.message = ""
 		m.err = nil
+		return nil, true
 
 	case "v":
-		snapshotID, ok := m.selectedSnapshotID()
+		snapshotID, ok := m.currentSnapshotID()
 		if !ok {
-			return m, nil
+			return nil, true
 		}
-
-		m.loading = true
-		m.err = nil
-		m.message = "Verifying snapshot..."
-
-		return m, verifySnapshotCmd(m.ctx, m.repoPath, snapshotID, m.privateKey)
+		return m.verifySnapshot(snapshotID), true
 
 	case "x":
-		snapshotID, ok := m.selectedSnapshotID()
+		snapshotID, ok := m.currentSnapshotID()
 		if !ok {
-			return m, nil
+			return nil, true
 		}
-
 		m.restore = &restoreRequest{snapshotID: snapshotID}
 		m.restoreForm = newTextPrompt(
 			"Restore snapshot "+snapshotID,
@@ -230,59 +280,31 @@ func (m *Model) handleBrowserKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		)
 		m.err = nil
 		m.message = ""
-
-	case "esc", "backspace", "left", "h":
-		return m.startLoading(m.openParentDirectory())
-
-	case "enter":
-		entry, ok := m.selectedEntry()
-		if !ok {
-			return m, nil
-		}
-
-		if entry.IsDir() {
-			return m.startLoading(m.openSelectedDirectory())
-		}
-
-		return m.startLoading(m.previewSelectedFile())
-
-	case "r":
-		return m.startLoading(loadRepositoryContent(m.ctx, m.folderRepo, m.currentPath))
-
-	case "up", "k":
-		m.message = ""
-		if m.cursor > 0 {
-			m.cursor--
-		}
-
-	case "down", "j":
-		m.message = ""
-		if m.cursor < len(m.entries)-1 {
-			m.cursor++
-		}
-
-	case "home", "g":
-		m.message = ""
-		m.cursor = 0
-
-	case "end", "G":
-		m.message = ""
-		if len(m.entries) > 0 {
-			m.cursor = len(m.entries) - 1
-		}
+		return nil, true
 	}
 
-	return m, nil
+	return nil, false
 }
 
-func (m *Model) startLoading(cmd tea.Cmd) (tea.Model, tea.Cmd) {
-	if cmd == nil {
-		return m, nil
+func moveCursor(key string, cursor, total, pageSize int) int {
+	if total == 0 {
+		return 0
 	}
 
-	m.loading = true
-	m.err = nil
-	m.message = ""
+	switch key {
+	case "up", "k":
+		cursor--
+	case "down", "j":
+		cursor++
+	case "pgup":
+		cursor -= pageSize
+	case "pgdown":
+		cursor += pageSize
+	case "home", "g":
+		cursor = 0
+	case "end", "G":
+		cursor = total - 1
+	}
 
-	return m, cmd
+	return min(max(cursor, 0), total-1)
 }

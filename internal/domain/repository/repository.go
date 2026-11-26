@@ -2,7 +2,7 @@ package repository
 
 import "context"
 
-type FolderRepository interface {
-	ReadEntries(ctx context.Context, path string) ([]Entry, error)
-	IsTextFile(ctx context.Context, filePath string) (bool, error)
+type Repository interface {
+	Initialized(ctx context.Context) (bool, error)
+	Initialize(ctx context.Context, options InitOptions) error
 }
