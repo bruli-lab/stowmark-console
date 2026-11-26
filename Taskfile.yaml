@@ -1,18 +1,111 @@
 version: '3'
 
 vars:
-  GOLANGCI_LINT_VERSION: 'v2.13.1'
+  GOLANGCI_LINT_VERSION: 'v2.15.0'
+  SANDBOX_DIR: '{{.ROOT_DIR}}/sandbox'
+  COMPOSE_FILE: docker/compose.yaml
+  LOCAL_ENV_DIR: docker/.local
 
 silent: false
 
 tasks:
   default:
-    desc: Mostra l'ajuda
+    desc: Show the available tasks
     cmds:
       - task --list
 
+  run:
+    desc: Start the console against the sandbox repository and the repositories in sandbox/repositories.yaml
+    interactive: true
+    env:
+      STOWMARK_REPOSITORY: '{{.SANDBOX_DIR}}/repository'
+      STOWMARK_CONSOLE_CONFIG: '{{.SANDBOX_DIR}}/repositories.yaml'
+    cmds:
+      - go run ./cmd/console
+
+  build:
+    desc: Build the binary into bin/
+    cmds:
+      - go build -o bin/stowmark_console ./cmd/console
+
+  mocks:
+    desc: Generate the interface mocks with moq
+    cmds:
+      - |
+        set -euo pipefail
+        echo "🧩 Generating mocks with moq..."
+        go tool moq -rm -out internal/mocks/repository.go -pkg mocks ./internal/domain/repository Repository:RepositoryMock
+        go tool moq -rm -out internal/mocks/catalog.go -pkg mocks ./internal/domain/repository Catalog:CatalogMock
+        go tool moq -rm -out internal/mocks/snapshot_repository.go -pkg mocks ./internal/domain/snapshot Repository:SnapshotRepositoryMock
+
+  env:keys:
+    desc: Generate the SSH key used by the local SSH server
+    cmds:
+      - mkdir -p {{.LOCAL_ENV_DIR}}/ssh
+      - ssh-keygen -q -t ed25519 -N "" -C stowmark-console -f {{.LOCAL_ENV_DIR}}/ssh/stowmark
+    status:
+      - test -f {{.LOCAL_ENV_DIR}}/ssh/stowmark
+
+  env:up:
+    desc: Start the local remote backends (SSH, S3, SMB, WebDAV and GCS) with Docker
+    deps:
+      - env:keys
+    env:
+      HOST_UID:
+        sh: id -u
+      HOST_GID:
+        sh: id -g
+    cmds:
+      - |
+        set -euo pipefail
+        echo "🐳 Starting remote backends..."
+        docker compose -f {{.COMPOSE_FILE}} up -d --wait
+        docker compose -f {{.COMPOSE_FILE}} exec -T ssh chown "$HOST_UID:$HOST_GID" /repositories
+        docker compose -f {{.COMPOSE_FILE}} exec -T smb chown "$HOST_UID:$HOST_GID" /shares/stowmark
+        curl -fsS -X PUT http://localhost:15000/stowmark > /dev/null
+        curl -fsS -X POST -H "Content-Type: application/json" -d '{"name":"stowmark"}' http://localhost:14443/storage/v1/b > /dev/null || true
+        for _ in $(seq 1 30); do
+          ssh-keyscan -p 12222 localhost > {{.LOCAL_ENV_DIR}}/ssh/known_hosts 2>/dev/null && test -s {{.LOCAL_ENV_DIR}}/ssh/known_hosts && break
+          sleep 1
+        done
+        test -s {{.LOCAL_ENV_DIR}}/ssh/known_hosts
+        echo "✅ Remote backends are ready"
+
+  env:down:
+    desc: Stop the local remote backends, keeping their data
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} down
+
+  env:clean:
+    desc: Stop the local remote backends and delete their data and keys
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} down -v
+      - rm -rf {{.LOCAL_ENV_DIR}}
+
+  run:remote:
+    desc: Start the console against a local remote backend (BACKEND=ssh|s3|smb|webdav|gcs)
+    interactive: true
+    requires:
+      vars:
+        - name: BACKEND
+          enum: [ssh, s3, smb, webdav, gcs]
+    dotenv:
+      - docker/env/{{.BACKEND}}.env
+    cmds:
+      - go run ./cmd/console
+
+  test:integration:
+    desc: Run the integration tests against the local remote backends
+    deps:
+      - env:up
+    cmds:
+      - |
+        set -euo pipefail
+        echo "🧪 Running integration tests (JSON → tparse)..."
+        go test -tags integration -count=1 ./internal/infra/store/... -json -cover | go tool tparse -all
+
   fmt:
-    desc: Format Go amb gofumpt
+    desc: Format the code with gofumpt
     cmds:
       - |
         set -euo pipefail
@@ -20,7 +113,7 @@ tasks:
         go tool gofumpt -w .
 
   fix:
-    desc: fixing code
+    desc: Apply go fix to the code
     cmds:
       - |
         set -euo pipefail
@@ -28,7 +121,7 @@ tasks:
         go fix -v ./...
 
   security:
-    desc: Revisar vulnerabilitats amb govulncheck
+    desc: Check for vulnerabilities with govulncheck
     cmds:
       - |
         set -euo pipefail
@@ -36,7 +129,7 @@ tasks:
         go tool govulncheck ./...
 
   install-lint:
-    desc: Instal·lar golangci-lint
+    desc: Install golangci-lint
     cmds:
       - |
         set -euo pipefail
@@ -44,7 +137,7 @@ tasks:
         go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
 
   lint:
-    desc: Executing golangci-lint
+    desc: Run golangci-lint
     deps:
       - install-lint
     cmds:
@@ -54,7 +147,7 @@ tasks:
         golangci-lint run ./...
 
   test:
-    desc: Executing tests amb race, coverage i tparse
+    desc: Run the tests with race detector and coverage, reported with tparse
     cmds:
       - |
         set -euo pipefail
@@ -62,10 +155,10 @@ tasks:
         go test -race ./... -json -cover -coverprofile=coverage.out | go tool tparse -all
 
   check:
-    desc: Executing fmt, security, lint
-    deps:
-      - fmt
-      - fix
-      - security
-      - lint
-      - test
+    desc: Run fmt, fix, security, lint and test in order
+    cmds:
+      - task: fmt
+      - task: fix
+      - task: security
+      - task: lint
+      - task: test

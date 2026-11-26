@@ -25,3 +25,10 @@ go.work.sum
 # env file
 .env
 
+
+# Local working notes
+docs/
+sandbox/
+bin/
+dist/
+docker/.local/

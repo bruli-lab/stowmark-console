@@ -1,6 +1,6 @@
 package console
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 const sidebarContentWidth = 24
 
@@ -12,6 +12,7 @@ var (
 	colorSurface   = lipgloss.Color("#181825")
 	colorSelected  = lipgloss.Color("#313244")
 	colorError     = lipgloss.Color("#F38BA8")
+	colorSuccess   = lipgloss.Color("#A6E3A1")
 
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -23,10 +24,14 @@ var (
 			Foreground(colorSecondary).
 			Bold(true)
 
+	surfaceStyle = lipgloss.NewStyle().Background(colorSurface)
+
+	splashVersionStyle = lipgloss.NewStyle().
+				Foreground(colorMuted).
+				Background(colorSurface)
+
 	logoStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#21E6D7")).
 			Background(colorSurface).
-			Bold(true).
 			Align(lipgloss.Center).
 			Width(sidebarContentWidth)
 
@@ -56,10 +61,6 @@ var (
 			Bold(true).
 			Foreground(colorSecondary)
 
-	selectedRowStyle = lipgloss.NewStyle().
-				Background(colorSelected).
-				Foreground(colorText)
-
 	errorStyle = lipgloss.NewStyle().
 			Foreground(colorError).
 			Bold(true)
@@ -69,24 +70,54 @@ var (
 			Background(colorSurface).
 			Padding(0, 1)
 
-	confirmRestoreStyle = lipgloss.NewStyle().
+	kindStyle = lipgloss.NewStyle().
+			Foreground(colorText).
+			Background(colorSelected).
+			Padding(0, 1)
+
+	errorBlockStyle = lipgloss.NewStyle().
+			Foreground(colorError).
+			Background(colorSurface).
+			Bold(true).
+			Padding(0, 1)
+
+	tableHeaderStyle = lipgloss.NewStyle().
+				Foreground(colorMuted).
 				Bold(true).
-				Foreground(colorText).
-				Background(colorPrimary).
-				Padding(1, 2).
-				MarginLeft(2)
-
-	snapshotFormStyle = lipgloss.NewStyle().
-				Foreground(colorText).
-				Background(colorSurface).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(colorPrimary).
-				Padding(1, 2).
-				Width(56)
-
-	snapshotInputStyle = lipgloss.NewStyle().
-				Foreground(colorText).
-				Background(colorSelected).
 				Padding(0, 1).
-				Width(48)
+				BorderStyle(lipgloss.NormalBorder()).
+				BorderBottom(true).
+				BorderForeground(colorSelected)
+
+	tableCellStyle = lipgloss.NewStyle().
+			Padding(0, 1)
+
+	tableSelectedStyle = lipgloss.NewStyle().
+				Background(colorSelected).
+				Foreground(colorText).
+				Bold(true)
+
+	mutedStyle = lipgloss.NewStyle().
+			Foreground(colorMuted)
+
+	highlightStyle = lipgloss.NewStyle().
+			Foreground(colorSecondary).
+			Bold(true)
+
+	dialogStyle = lipgloss.NewStyle().
+			Foreground(colorText).
+			Background(colorSurface).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorPrimary).
+			Padding(1, 2).
+			Width(76)
+
+	inputStyle = lipgloss.NewStyle().
+			Foreground(colorText).
+			Background(colorSelected).
+			Padding(0, 1).
+			Width(68)
+
+	successStyle = lipgloss.NewStyle().
+			Foreground(colorSuccess)
 )

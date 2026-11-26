@@ -2,445 +2,191 @@ package console
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/bruli-lab/stowmark-console.git/internal/config"
-	"github.com/bruli-lab/stowmark-console.git/internal/domain/repository"
-	"github.com/bruli-lab/stowmark-console.git/internal/infra/disk"
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
+	"github.com/bruli-lab/stowmark-console/internal/app"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
 
 type Model struct {
-	ctx               context.Context
-	conf              *config.Config
-	folderRepo        repository.FolderRepository
-	entries           []repository.Entry
-	cursor            int
-	currentPath       string
-	previewPath       string
-	previewLines      []string
-	previewOffset     int
-	previewing        bool
-	width             int
-	height            int
-	loading           bool
-	err               error
-	commandMode       bool
-	commandInput      string
-	message           string
-	repoPath          string
-	confirmingRestore bool
-	pendingSnapshotID string
-	creatingSnapshot  bool
-	snapshotOrigin    string
-	snapshotFormError string
-	preserveMessage   bool
-	formatVersion     int
-	publicKey         *string
-	force             bool
-	privateKey        *string
-	destinationPath   *string
+	ctx             context.Context
+	buses           app.Buses
+	repositories    []repository.Profile
+	current         repository.Profile
+	width           int
+	height          int
+	snapshots       *snapshotsScreen
+	screens         []screen
+	dialog          dialog
+	command         *commandLine
+	loading         bool
+	progress        string
+	cancelOperation context.CancelFunc
+	message         string
+	err             error
+	openDirectory   string
+	opener          FileOpener
+	splash          *splash
 }
 
-func New(ctx context.Context, conf *config.Config) Model {
-	return Model{
-		ctx:         ctx,
-		conf:        conf,
-		loading:     true,
-		folderRepo:  disk.NewFolderRepository(),
-		currentPath: filepath.Clean(conf.Repository()),
-		repoPath:    conf.Repository(),
+type FileOpener func(path string) error
+
+type Option func(*Model)
+
+func WithFileOpener(directory string, opener FileOpener) Option {
+	return func(m *Model) {
+		m.openDirectory = directory
+		m.opener = opener
 	}
 }
 
-func (m *Model) openSelectedFile() tea.Cmd {
-	if len(m.entries) == 0 ||
-		m.cursor < 0 ||
-		m.cursor >= len(m.entries) {
+func New(ctx context.Context, buses app.Buses, options ...Option) Model {
+	model := Model{
+		ctx:       ctx,
+		buses:     buses,
+		snapshots: newSnapshotsScreen(),
+		loading:   true,
+	}
+
+	for _, option := range options {
+		option(&model)
+	}
+
+	return model
+}
+
+func (m *Model) Init() tea.Cmd {
+	if m.splash != nil {
+		return tea.Batch(m.loadRepositories(), m.splash.timer())
+	}
+
+	return m.loadRepositories()
+}
+
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		m.resizeScreens()
+		return m, nil
+
+	case splashFinishedMsg:
+		m.splash = nil
+		return m, nil
+
+	case tea.KeyPressMsg:
+		if m.splash != nil {
+			cmd := m.skipSplash(msg)
+			return m, cmd
+		}
+		cmd := m.handleKey(msg)
+		return m, cmd
+
+	case tea.PasteMsg:
+		cmd := m.handleInput(msg)
+		return m, cmd
+	}
+
+	if cmd, handled := m.handleIntent(msg); handled {
+		return m, cmd
+	}
+
+	cmd := m.handleResult(msg)
+
+	return m, cmd
+}
+
+func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
+	switch {
+	case m.dialog != nil || m.command != nil:
+		return m.handleInput(msg)
+	case msg.String() == "ctrl+c":
+		return tea.Quit
+	case m.loading:
+		m.handleLoadingKey(msg)
+		return nil
+	case msg.String() == ":":
+		m.command = newCommandLine()
 		return nil
 	}
 
-	entry := m.entries[m.cursor]
-	if entry.IsDir() {
-		return nil
-	}
-
-	filePath := filepath.Join(
-		m.currentPath,
-		entry.Name(),
-	)
-
-	isText, err := m.folderRepo.IsTextFile(m.ctx, filePath)
-	if err != nil {
-		return func() tea.Msg {
-			return editorFinishedMsg{err: err}
-		}
-	}
-
-	if !isText {
-		return func() tea.Msg {
-			return editorFinishedMsg{
-				err: fmt.Errorf("%q no és un fitxer de text", entry.Name()),
-			}
-		}
-	}
-
-	command, err := editorCommand(filePath)
-	if err != nil {
-		return func() tea.Msg {
-			return editorFinishedMsg{err: err}
-		}
-	}
-
-	return tea.ExecProcess(command, func(err error) tea.Msg {
-		return editorFinishedMsg{err: err}
-	})
-}
-
-func (m *Model) requestRestore(snapshotID string) {
-	m.confirmingRestore = true
-	m.pendingSnapshotID = snapshotID
 	m.err = nil
 	m.message = ""
+
+	return m.top().update(msg)
 }
 
-func (m *Model) activeSection() string {
-	rootPath := filepath.Clean(m.conf.Repository())
-	currentPath := filepath.Clean(m.currentPath)
-
-	relativePath, err := filepath.Rel(rootPath, currentPath)
-	if err != nil || relativePath == "." {
-		return "repository"
-	}
-
-	firstDirectory, _, _ := strings.Cut(relativePath, string(filepath.Separator))
-
-	switch strings.ToLower(firstDirectory) {
-	case "snapshots":
-		return "snapshots"
-	case "objects":
-		return "objects"
-	default:
-		return "repository"
-	}
-}
-
-func (m *Model) previewVisibleLines() int {
-	return max(1, m.height-8)
-}
-
-func (m *Model) isSnapshotsDirectory() bool {
-	snapshotsPath := filepath.Join(
-		filepath.Clean(m.conf.Repository()),
-		"snapshots",
-	)
-
-	return filepath.Clean(m.currentPath) == snapshotsPath
-}
-
-func (m *Model) selectedSnapshotPath() (string, bool) {
-	if !m.isSnapshotsDirectory() ||
-		len(m.entries) == 0 ||
-		m.cursor < 0 ||
-		m.cursor >= len(m.entries) ||
-		m.entries[m.cursor].IsDir() {
-		return "", false
-	}
-
-	return filepath.Join(
-		m.currentPath,
-		m.entries[m.cursor].Name(),
-	), true
-}
-
-func (m *Model) renderSidebar(availableHeight int) string {
-	activeSection := m.activeSection()
-
-	items := []struct {
-		label    string
-		selected bool
-	}{
-		{
-			label:    "Repository",
-			selected: activeSection == "repository",
-		},
-		{
-			label:    "Snapshots",
-			selected: activeSection == "snapshots",
-		},
-		{
-			label:    "Objects",
-			selected: activeSection == "objects",
-		},
-	}
-
-	var builder strings.Builder
-
-	if availableHeight >= 16 {
-		builder.WriteString(logoStyle.Render(stowmarkLogo))
-		builder.WriteString("\n\n")
-	}
-
-	builder.WriteString(headerStyle.Render("Navigation"))
-	builder.WriteString("\n\n")
-
-	for _, item := range items {
-		style := menuStyle
-		prefix := "  "
-
-		if item.selected {
-			style = selectedMenuStyle
-			prefix = "› "
+func (m *Model) handleInput(msg tea.Msg) tea.Cmd {
+	switch {
+	case m.dialog != nil:
+		closed, cmd := m.dialog.update(msg)
+		if closed {
+			m.dialog = nil
 		}
+		return cmd
 
-		builder.WriteString(style.Render(prefix + item.label))
-		builder.WriteString("\n")
-	}
-
-	return builder.String()
-}
-
-func (m *Model) previewSelectedFile() tea.Cmd {
-	if len(m.entries) == 0 ||
-		m.cursor < 0 ||
-		m.cursor >= len(m.entries) {
-		return nil
-	}
-
-	entry := m.entries[m.cursor]
-	if entry.IsDir() {
-		return nil
-	}
-
-	filePath := filepath.Join(m.currentPath, entry.Name())
-
-	return func() tea.Msg {
-		isText, err := m.folderRepo.IsTextFile(m.ctx, filePath)
-		if err != nil {
-			return filePreviewLoadedMsg{
-				path: filePath,
-				err:  err,
-			}
+	case m.command != nil:
+		closed, cmd := m.command.update(msg)
+		if closed {
+			m.command = nil
 		}
+		return cmd
+	}
 
-		if !isText {
-			return filePreviewLoadedMsg{
-				path: filePath,
-				err: fmt.Errorf(
-					"%q no és un fitxer de text",
-					entry.Name(),
-				),
-			}
-		}
+	return nil
+}
 
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			return filePreviewLoadedMsg{
-				path: filePath,
-				err: fmt.Errorf(
-					"read file %q: %w",
-					filePath,
-					err,
-				),
-			}
-		}
-
-		return filePreviewLoadedMsg{
-			path:    filePath,
-			content: string(content),
-		}
+func (m *Model) handleLoadingKey(msg tea.KeyPressMsg) {
+	if msg.String() == "esc" && m.cancelOperation != nil {
+		m.cancelOperation()
+		m.progress = "Cancelling..."
 	}
 }
 
-func (m *Model) renderFilePreview(availableHeight int) string {
-	var builder strings.Builder
-
-	builder.WriteString(
-		headerStyle.Render(filepath.Base(m.previewPath)),
-	)
-	builder.WriteString("\n\n")
-
-	visibleLines := max(1, availableHeight-3)
-	start := min(m.previewOffset, len(m.previewLines))
-	end := min(len(m.previewLines), start+visibleLines)
-
-	lineNumberWidth := len(fmt.Sprintf("%d", len(m.previewLines)))
-	contentWidth := max(1, m.width-38-lineNumberWidth)
-
-	for index := start; index < end; index++ {
-		line := strings.ReplaceAll(m.previewLines[index], "\t", "    ")
-		line = truncate(line, contentWidth)
-
-		_, _ = fmt.Fprintf(
-			&builder,
-			"%*d │ %s\n",
-			lineNumberWidth,
-			index+1,
-			line,
-		)
+func (m *Model) top() screen {
+	if len(m.screens) == 0 {
+		return m.snapshots
 	}
 
-	return builder.String()
+	return m.screens[len(m.screens)-1]
 }
 
-func (m *Model) renderContent(availableHeight int) string {
-	if m.previewing {
-		return m.renderFilePreview(availableHeight)
-	}
-	var builder strings.Builder
-
-	builder.WriteString(headerStyle.Render("Repository contents"))
-	builder.WriteString("\n\n")
-
-	if m.loading {
-		builder.WriteString("Loading repository...")
-		return builder.String()
-	}
-
-	if m.err != nil {
-		builder.WriteString(errorStyle.Render(m.err.Error()))
-		return builder.String()
-	}
-
-	if len(m.entries) == 0 {
-		builder.WriteString("The repository is empty.")
-		return builder.String()
-	}
-
-	_, _ = fmt.Fprintf(
-		&builder,
-		"  %-40s %-12s %12s\n",
-		"NAME",
-		"TYPE",
-		"SIZE",
-	)
-
-	builder.WriteString(
-		strings.Repeat("─", min(68, max(1, m.width-32))),
-	)
-	builder.WriteString("\n")
-
-	maxRows := max(1, availableHeight-6)
-	start := 0
-
-	if m.cursor >= maxRows {
-		start = m.cursor - maxRows + 1
-	}
-
-	end := min(len(m.entries), start+maxRows)
-
-	for index := start; index < end; index++ {
-		entry := m.entries[index]
-
-		entryType := "file"
-		size := formatSize(entry.Size())
-
-		if entry.IsDir() {
-			entryType = "directory"
-			size = "-"
-		}
-
-		row := fmt.Sprintf(
-			"  %-40s %-12s %12s",
-			truncate(entry.Name(), 40),
-			entryType,
-			size,
-		)
-
-		if index == m.cursor {
-			row = selectedRowStyle.Render("›" + row[1:])
-		}
-
-		builder.WriteString(row)
-		builder.WriteString("\n")
-	}
-
-	return builder.String()
+func (m *Model) push(next screen) {
+	m.screens = append(m.screens, next)
+	m.resizeScreens()
 }
 
-func (m *Model) openSelectedDirectory() tea.Cmd {
-	if len(m.entries) == 0 ||
-		m.cursor < 0 ||
-		m.cursor >= len(m.entries) {
-		return nil
+func (m *Model) pop() {
+	if len(m.screens) > 0 {
+		m.screens = m.screens[:len(m.screens)-1]
 	}
-
-	entry := m.entries[m.cursor]
-	if !entry.IsDir() {
-		return nil
-	}
-
-	nextPath := filepath.Join(m.currentPath, entry.Name())
-
-	return loadRepositoryContent(
-		m.ctx,
-		m.folderRepo,
-		nextPath,
-	)
 }
 
-func (m *Model) openParentDirectory() tea.Cmd {
-	rootPath := filepath.Clean(m.conf.Repository())
-	currentPath := filepath.Clean(m.currentPath)
-
-	if currentPath == rootPath {
-		return nil
+func (m *Model) showManifest(manifest snapshot.Manifest) {
+	if files, ok := m.top().(*filesScreen); ok && files.snapshotID() == manifest.SnapshotID() {
+		files.setManifest(manifest)
+		return
 	}
 
-	parentPath := filepath.Dir(currentPath)
-
-	relativePath, err := filepath.Rel(rootPath, parentPath)
-	if err != nil ||
-		relativePath == ".." ||
-		strings.HasPrefix(
-			relativePath,
-			".."+string(filepath.Separator),
-		) {
-		return nil
-	}
-
-	return loadRepositoryContent(
-		m.ctx,
-		m.folderRepo,
-		parentPath,
-	)
+	m.push(newFilesScreen(manifest))
 }
 
-func formatSize(size int64) string {
-	const unit = 1024
-
-	if size < unit {
-		return fmt.Sprintf("%d B", size)
-	}
-
-	divisor := int64(unit)
-	exponent := 0
-
-	for value := size / unit; value >= unit; value /= unit {
-		divisor *= unit
-		exponent++
-	}
-
-	units := "KMGTPE"
-
-	return fmt.Sprintf(
-		"%.1f %ciB",
-		float64(size)/float64(divisor),
-		units[exponent],
-	)
+func (m *Model) connected() bool {
+	return m.current.Name() != ""
 }
 
-func truncate(value string, width int) string {
-	if len(value) <= width {
-		return value
-	}
+func (m *Model) showRepositories() {
+	m.screens = []screen{newRepositoriesScreen(m.repositories, m.current.Name())}
+	m.resizeScreens()
+}
 
-	if width <= 1 {
-		return value[:width]
-	}
+func (m *Model) resizeScreens() {
+	width, height := m.contentSize()
 
-	return value[:width-1] + "…"
+	m.snapshots.resize(width, height)
+	for _, item := range m.screens {
+		item.resize(width, height)
+	}
 }

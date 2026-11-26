@@ -1,42 +1,67 @@
 package console
 
 import (
-	"github.com/bruli-lab/stowmark-console.git/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
 
-type repositoryLoadedMsg struct {
-	entries []repository.Entry
-	err     error
-	path    string
+type repositoriesLoadedMsg struct {
+	profiles []repository.Profile
+	err      error
 }
 
-type editorFinishedMsg struct {
-	err error
+type repositoryOpenedMsg struct {
+	name  string
+	event repository.Opened
+	err   error
 }
 
-type filePreviewLoadedMsg struct {
-	path    string
-	content string
-	err     error
+type repositoryStatusMsg struct {
+	initialized bool
+	err         error
+}
+
+type repositoryInitializedMsg struct {
+	event repository.Initialized
+	err   error
+}
+
+type snapshotsLoadedMsg struct {
+	snapshots []snapshot.Snapshot
+	selectID  string
+	err       error
+}
+
+type manifestLoadedMsg struct {
+	manifest snapshot.Manifest
+	err      error
+}
+
+type fileContentLoadedMsg struct {
+	request   filePreviewRequested
+	content   previewContent
+	truncated bool
+	err       error
+}
+
+type fileOpenedMsg struct {
+	name string
+	err  error
+}
+
+type snapshotCreatedMsg struct {
+	event snapshot.Created
+	err   error
 }
 
 type snapshotVerifiedMsg struct {
 	snapshotID string
+	event      snapshot.Verified
 	err        error
 }
 
 type snapshotRestoredMsg struct {
 	snapshotID string
+	event      snapshot.Restored
 	err        error
-}
-
-type snapshotCreatedMsg struct {
-	snapshotID string
-	fileCount  int
-	totalSize  int64
-	err        error
-}
-
-type initRepositoryMsg struct {
-	err error
 }
