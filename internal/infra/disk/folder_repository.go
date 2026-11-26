@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/bruli-lab/stowmark-console.git/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 )
 
 type FolderRepository struct{}

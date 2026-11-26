@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/bruli-lab/stowmark-console.git/internal/config"
+	"github.com/bruli-lab/stowmark-console/internal/config"
 	"github.com/stretchr/testify/require"
 )
 

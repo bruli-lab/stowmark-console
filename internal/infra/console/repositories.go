@@ -3,7 +3,7 @@ package console
 import (
 	"context"
 
-	"github.com/bruli-lab/stowmark-console.git/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

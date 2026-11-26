@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  GOLANGCI_LINT_VERSION: 'v2.13.1'
+  GOLANGCI_LINT_VERSION: 'v2.15.0'
   SANDBOX_DIR: '{{.ROOT_DIR}}/sandbox'
 
 silent: false
@@ -71,10 +71,10 @@ tasks:
         go test -race ./... -json -cover -coverprofile=coverage.out | go tool tparse -all
 
   check:
-    desc: Executing fmt, security, lint
-    deps:
-      - fmt
-      - fix
-      - security
-      - lint
-      - test
+    desc: Executing fmt, fix, security, lint i test en ordre
+    cmds:
+      - task: fmt
+      - task: fix
+      - task: security
+      - task: lint
+      - task: test

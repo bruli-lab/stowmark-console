@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bruli-lab/stowmark-console.git/internal/config"
-	"github.com/bruli-lab/stowmark-console.git/internal/infra/console"
+	"github.com/bruli-lab/stowmark-console/internal/config"
+	"github.com/bruli-lab/stowmark-console/internal/infra/console"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

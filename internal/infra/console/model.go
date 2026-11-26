@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bruli-lab/stowmark-console.git/internal/config"
-	"github.com/bruli-lab/stowmark-console.git/internal/domain/repository"
-	"github.com/bruli-lab/stowmark-console.git/internal/infra/disk"
+	"github.com/bruli-lab/stowmark-console/internal/config"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/infra/disk"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
