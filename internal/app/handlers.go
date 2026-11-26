@@ -13,6 +13,7 @@ type Handlers struct {
 	ListSnapshots    *ListSnapshots
 	GetManifest      *GetManifest
 	GetFileContent   *GetFileContent
+	ExtractFile      *ExtractFile
 	CreateSnapshot   *CreateSnapshot
 	VerifySnapshot   *VerifySnapshot
 	RestoreSnapshot  *RestoreSnapshot
@@ -27,6 +28,7 @@ func NewHandlers(catalog repository.Catalog, repositories repository.Repository,
 		ListSnapshots:    NewListSnapshots(snapshots),
 		GetManifest:      NewGetManifest(snapshots),
 		GetFileContent:   NewGetFileContent(snapshots),
+		ExtractFile:      NewExtractFile(snapshots),
 		CreateSnapshot:   NewCreateSnapshot(snapshots),
 		VerifySnapshot:   NewVerifySnapshot(snapshots),
 		RestoreSnapshot:  NewRestoreSnapshot(snapshots),

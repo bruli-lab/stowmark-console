@@ -28,6 +28,10 @@ type filePreviewRequested struct {
 	file       snapshot.File
 }
 
+type fileOpenRequested struct {
+	request filePreviewRequested
+}
+
 type screenCloseRequested struct{}
 
 type snapshotsScreenRequested struct{}
@@ -117,6 +121,8 @@ func (m *Model) handleOperationIntent(msg tea.Msg) (tea.Cmd, bool) {
 		start = func() tea.Cmd { return m.openSnapshot(msg.snapshotID) }
 	case filePreviewRequested:
 		start = func() tea.Cmd { return m.loadFileContent(msg) }
+	case fileOpenRequested:
+		start = func() tea.Cmd { return m.openFile(msg.request) }
 	case snapshotSourceChosen:
 		start = func() tea.Cmd { return m.createSnapshot(msg.source) }
 	case snapshotVerifyRequested:

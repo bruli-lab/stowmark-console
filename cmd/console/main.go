@@ -11,6 +11,7 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/config"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/infra/console"
+	"github.com/bruli-lab/stowmark-console/internal/infra/desktop"
 	"github.com/bruli-lab/stowmark-console/internal/infra/stderr"
 	"github.com/bruli-lab/stowmark-console/internal/infra/store"
 )
@@ -55,7 +56,13 @@ func runConsole(conf *config.Config) (err error) {
 
 	catalog := store.NewCatalog(session, catalogEntries(conf.Repositories))
 	handlers := app.NewHandlers(catalog, store.NewRepositories(session), store.NewSnapshots(session))
-	model := console.New(ctx, &handlers)
+	openDirectory, err := os.MkdirTemp("", "stowmark-console-open-*")
+	if err != nil {
+		return fmt.Errorf("creating the directory for opened files: %w", err)
+	}
+	defer func() { err = errors.Join(err, os.RemoveAll(openDirectory)) }()
+
+	model := console.New(ctx, &handlers, console.WithFileOpener(openDirectory, desktop.Open))
 
 	if _, err := tea.NewProgram(&model).Run(); err != nil {
 		return fmt.Errorf("running console: %w", err)

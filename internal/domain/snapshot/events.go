@@ -22,3 +22,9 @@ type Restored struct {
 func (r Restored) Succeeded() bool {
 	return len(r.Failures) == 0
 }
+
+type FileExtracted struct {
+	SnapshotID string
+	Path       string
+	Location   string
+}

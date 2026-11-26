@@ -162,7 +162,8 @@ The initialization options only apply when the console creates a new repository,
 | Key | Action |
 | --- | --- |
 | `↑` / `k`, `↓` / `j` | Select the previous or next entry |
-| `Enter` / `→` / `l` | Open a directory or preview a text file |
+| `Enter` / `→` / `l` | Open a directory or preview a file |
+| `o` | Open the selected file with the system application |
 | `Esc` / `Backspace` / `←` / `h` | Go to the parent directory, or back to the snapshots |
 | `v` / `x` | Verify or restore the snapshot being browsed |
 | `c` | Create a snapshot |
@@ -176,9 +177,16 @@ The initialization options only apply when the console creates a new repository,
 | `←` / `h`, `→` / `l` | Scroll long lines horizontally |
 | `PgUp` / `b`, `PgDown` / `f` / `Space` | Scroll one page |
 | `g` / `Home`, `G` / `End` | Go to the top or the bottom |
+| `o` | Open the file with the system application |
 | `Esc` / `q` | Close the preview |
 
-Previews read at most the first 1 MiB of a file from the snapshot.
+The preview adapts to the content of the file:
+
+- **Text** is shown with line numbers. At most the first 1 MiB is read.
+- **Images** (PNG, JPEG and GIF up to 32 MiB) are drawn with half-block characters scaled to the panel, so they need a terminal with true color support.
+- **Other binary files** are shown in hexadecimal, like `xxd`, with the offset, the bytes and their printable characters. At most the first 1 MiB is read.
+
+`o` extracts the whole file from the snapshot to a temporary directory and opens it with `xdg-open` (`open` on macOS), so it needs a graphical session. The temporary directory is deleted when the console exits.
 
 ### Command line
 

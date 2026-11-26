@@ -68,6 +68,13 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 	case fileContentLoadedMsg:
 		m.handleFileContent(&msg)
 
+	case fileOpenedMsg:
+		m.finishOperation()
+		if m.fail("open "+msg.name, msg.err) {
+			return nil
+		}
+		m.message = "Opened " + msg.name + " with the system application"
+
 	case snapshotCreatedMsg:
 		m.finishOperation()
 		if m.fail("create snapshot", msg.err) {
@@ -114,12 +121,7 @@ func (m *Model) handleFileContent(msg *fileContentLoadedMsg) {
 	if m.fail("read "+msg.request.name, msg.err) {
 		return
 	}
-	if !isText(msg.content) {
-		m.err = fmt.Errorf("%q is not a text file", msg.request.name)
-		return
-	}
-
-	m.push(newPreviewScreen(msg.request.location, msg.request.name, msg.content, msg.truncated))
+	m.push(newPreviewScreen(msg.request, &msg.content, msg.truncated))
 }
 
 func (m *Model) fail(action string, err error) bool {

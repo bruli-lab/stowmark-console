@@ -22,6 +22,9 @@ var _ snapshot.Repository = &SnapshotRepositoryMock{}
 //			CreateFunc: func(ctx context.Context, source string) (snapshot.Snapshot, error) {
 //				panic("mock out the Create method")
 //			},
+//			ExtractFileFunc: func(ctx context.Context, snapshotID string, path string, directory string) (string, error) {
+//				panic("mock out the ExtractFile method")
+//			},
 //			FileContentFunc: func(ctx context.Context, snapshotID string, path string, maxSize int64) ([]byte, error) {
 //				panic("mock out the FileContent method")
 //			},
@@ -47,6 +50,9 @@ type SnapshotRepositoryMock struct {
 	// CreateFunc mocks the Create method.
 	CreateFunc func(ctx context.Context, source string) (snapshot.Snapshot, error)
 
+	// ExtractFileFunc mocks the ExtractFile method.
+	ExtractFileFunc func(ctx context.Context, snapshotID string, path string, directory string) (string, error)
+
 	// FileContentFunc mocks the FileContent method.
 	FileContentFunc func(ctx context.Context, snapshotID string, path string, maxSize int64) ([]byte, error)
 
@@ -70,6 +76,17 @@ type SnapshotRepositoryMock struct {
 			Ctx context.Context
 			// Source is the source argument value.
 			Source string
+		}
+		// ExtractFile holds details about calls to the ExtractFile method.
+		ExtractFile []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SnapshotID is the snapshotID argument value.
+			SnapshotID string
+			// Path is the path argument value.
+			Path string
+			// Directory is the directory argument value.
+			Directory string
 		}
 		// FileContent holds details about calls to the FileContent method.
 		FileContent []struct {
@@ -112,6 +129,7 @@ type SnapshotRepositoryMock struct {
 		}
 	}
 	lockCreate      sync.RWMutex
+	lockExtractFile sync.RWMutex
 	lockFileContent sync.RWMutex
 	lockList        sync.RWMutex
 	lockManifest    sync.RWMutex
@@ -152,6 +170,50 @@ func (mock *SnapshotRepositoryMock) CreateCalls() []struct {
 	mock.lockCreate.RLock()
 	calls = mock.calls.Create
 	mock.lockCreate.RUnlock()
+	return calls
+}
+
+// ExtractFile calls ExtractFileFunc.
+func (mock *SnapshotRepositoryMock) ExtractFile(ctx context.Context, snapshotID string, path string, directory string) (string, error) {
+	if mock.ExtractFileFunc == nil {
+		panic("SnapshotRepositoryMock.ExtractFileFunc: method is nil but Repository.ExtractFile was just called")
+	}
+	callInfo := struct {
+		Ctx        context.Context
+		SnapshotID string
+		Path       string
+		Directory  string
+	}{
+		Ctx:        ctx,
+		SnapshotID: snapshotID,
+		Path:       path,
+		Directory:  directory,
+	}
+	mock.lockExtractFile.Lock()
+	mock.calls.ExtractFile = append(mock.calls.ExtractFile, callInfo)
+	mock.lockExtractFile.Unlock()
+	return mock.ExtractFileFunc(ctx, snapshotID, path, directory)
+}
+
+// ExtractFileCalls gets all the calls that were made to ExtractFile.
+// Check the length with:
+//
+//	len(mockedRepository.ExtractFileCalls())
+func (mock *SnapshotRepositoryMock) ExtractFileCalls() []struct {
+	Ctx        context.Context
+	SnapshotID string
+	Path       string
+	Directory  string
+} {
+	var calls []struct {
+		Ctx        context.Context
+		SnapshotID string
+		Path       string
+		Directory  string
+	}
+	mock.lockExtractFile.RLock()
+	calls = mock.calls.ExtractFile
+	mock.lockExtractFile.RUnlock()
 	return calls
 }
 

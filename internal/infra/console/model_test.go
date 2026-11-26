@@ -1,10 +1,15 @@
 package console
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"unicode/utf8"
 
@@ -16,17 +21,21 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/fixtures"
 	"github.com/bruli-lab/stowmark-console/internal/mocks"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/require"
 )
 
 const snapshotID = "20261126T160034Z-f482b24d"
 
 type harness struct {
-	model        *Model
-	profiles     []repository.Profile
-	catalog      *mocks.CatalogMock
-	repositories *mocks.RepositoryMock
-	snapshots    *mocks.SnapshotRepositoryMock
+	model         *Model
+	openDirectory string
+	opened        []string
+	openErr       error
+	profiles      []repository.Profile
+	catalog       *mocks.CatalogMock
+	repositories  *mocks.RepositoryMock
+	snapshots     *mocks.SnapshotRepositoryMock
 }
 
 var errUnreachable = errors.New("unreachable")
@@ -51,6 +60,9 @@ func newHarness(t *testing.T, initialized bool) *harness {
 			return nil, ctx.Err()
 		},
 		RestoreFunc: func(context.Context, string, string) ([]snapshot.Failure, error) { return nil, nil },
+		ExtractFileFunc: func(_ context.Context, _, path, directory string) (string, error) {
+			return filepath.Join(directory, filepath.Base(path)), nil
+		},
 	}
 	h := &harness{
 		profiles: []repository.Profile{
@@ -71,7 +83,11 @@ func newHarness(t *testing.T, initialized bool) *harness {
 		},
 	}
 	handlers := app.NewHandlers(h.catalog, repositories, snapshots)
-	model := New(t.Context(), &handlers)
+	h.openDirectory = t.TempDir()
+	model := New(t.Context(), &handlers, WithFileOpener(h.openDirectory, func(path string) error {
+		h.opened = append(h.opened, path)
+		return h.openErr
+	}))
 	model.width, model.height = 120, 40
 	h.model = &model
 
@@ -303,7 +319,7 @@ func TestConsoleBrowsing(t *testing.T) {
 
 	t.Run(`Given a binary file of a snapshot
 	When the user opens it
-	Then an error is shown instead of a preview`, func(t *testing.T) {
+	Then it is previewed in hexadecimal`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
 		h.snapshots.FileContentFunc = func(context.Context, string, string, int64) ([]byte, error) {
@@ -314,9 +330,107 @@ func TestConsoleBrowsing(t *testing.T) {
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.Nil(t, h.preview())
-		require.ErrorContains(t, h.model.err, "not a text file")
+		require.NoError(t, h.model.err)
+		require.Equal(t, binaryPreview, h.preview().content.kind)
+		require.Contains(t, h.view(), "89 50 4e 47 00 01")
+		require.Contains(t, h.view(), "hexadecimal view")
 	})
+
+	t.Run(`Given an image file of a snapshot
+	When the user opens it
+	Then it is drawn with its format and size`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.snapshots.FileContentFunc = func(context.Context, string, string, int64) ([]byte, error) {
+			return encodedImage(t, 40, 20), nil
+		}
+		h.pressAndRun(key(tea.KeyEnter))
+		h.pressAndRun(runes("j"))
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Equal(t, imagePreview, h.preview().content.kind)
+		view := h.view()
+		require.Contains(t, view, "PNG image, 40×20")
+		require.Contains(t, view, "▀")
+	})
+}
+
+func TestConsoleOpenFile(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given a file of a snapshot
+	When the user opens it with the system application
+	Then it is extracted to the open directory and handed to the opener`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(key(tea.KeyEnter))
+		h.pressAndRun(runes("j"))
+
+		h.pressAndRun(runes("o"))
+
+		call := h.snapshots.ExtractFileCalls()[0]
+		require.Equal(t, "/home/user/documents/README.txt", call.Path)
+		require.Equal(t, h.openDirectory, call.Directory)
+		require.Equal(t, []string{filepath.Join(h.openDirectory, "README.txt")}, h.opened)
+		require.Contains(t, h.model.message, "Opened README.txt")
+	})
+
+	t.Run(`Given a previewed file
+	When the user opens it with the system application
+	Then the previewed file is opened`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(key(tea.KeyEnter))
+		h.pressAndRun(runes("j"))
+		h.pressAndRun(key(tea.KeyEnter))
+
+		h.pressAndRun(runes("o"))
+
+		require.Len(t, h.opened, 1)
+		require.NotNil(t, h.preview())
+	})
+
+	t.Run(`Given a directory of a snapshot
+	When the user tries to open it with the system application
+	Then nothing is extracted`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(key(tea.KeyEnter))
+
+		h.pressAndRun(runes("o"))
+
+		require.Empty(t, h.snapshots.ExtractFileCalls())
+	})
+
+	t.Run(`Given an opener that fails
+	When the user opens a file with the system application
+	Then the error is shown`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.openErr = errUnreachable
+		h.pressAndRun(key(tea.KeyEnter))
+		h.pressAndRun(runes("j"))
+
+		h.pressAndRun(runes("o"))
+
+		require.ErrorIs(t, h.model.err, errUnreachable)
+	})
+}
+
+func encodedImage(t *testing.T, width, height int) []byte {
+	t.Helper()
+	picture := image.NewRGBA(image.Rect(0, 0, width, height))
+	for x := range width {
+		for y := range height {
+			picture.Set(x, y, color.RGBA{R: uint8(x * 6), G: uint8(y * 12), B: 128, A: 255})
+		}
+	}
+
+	var buffer bytes.Buffer
+	require.NoError(t, png.Encode(&buffer, picture))
+
+	return buffer.Bytes()
 }
 
 func TestConsoleRestore(t *testing.T) {
@@ -935,5 +1049,51 @@ func TestKnownOrigins(t *testing.T) {
 		}
 
 		require.Equal(t, []string{"/data/", "/home/"}, knownOrigins(snapshots))
+	})
+}
+
+func TestHexLines(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given content longer than a line
+	When it is shown in hexadecimal
+	Then each line has the offset, the bytes and the printable characters`, func(t *testing.T) {
+		t.Parallel()
+
+		lines := hexLines([]byte("ABCDEFGHIJKLMNOPQ\x00"))
+
+		require.Len(t, lines, 2)
+		require.Contains(t, ansi.Strip(lines[0]), "00000000  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|")
+		require.Contains(t, ansi.Strip(lines[1]), "00000010  51 00")
+		require.True(t, strings.HasSuffix(ansi.Strip(lines[1]), "|Q.|"))
+	})
+}
+
+func TestImageLines(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given a wide image and a panel
+	When it is drawn
+	Then it keeps its aspect ratio inside the panel using two pixels per cell`, func(t *testing.T) {
+		t.Parallel()
+		picture, _, err := image.Decode(bytes.NewReader(encodedImage(t, 200, 100)))
+		require.NoError(t, err)
+
+		lines := imageLines(picture, 50, 40)
+
+		require.Len(t, lines, 13)
+		require.Equal(t, 50, ansi.StringWidth(lines[0]))
+	})
+
+	t.Run(`Given a large image
+	When it is classified
+	Then a thumbnail is kept with the original size`, func(t *testing.T) {
+		t.Parallel()
+
+		content := classifyContent(encodedImage(t, 1024, 256))
+
+		require.Equal(t, imagePreview, content.kind)
+		require.Equal(t, 1024, content.width)
+		require.Equal(t, maxImagePixels, content.image.Bounds().Dx())
 	})
 }

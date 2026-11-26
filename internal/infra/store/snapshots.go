@@ -126,11 +126,7 @@ func (s *Snapshots) FileContent(ctx context.Context, snapshotID, path string, ma
 	}
 	defer func() { _ = os.RemoveAll(directory) }()
 
-	if err := handler.RestoreFile(ctx, snapshotID, path, &directory, nil); err != nil {
-		return nil, err
-	}
-
-	restored, err := findSingleFile(directory)
+	restored, err := restoreSingleFile(ctx, handler, snapshotID, path, directory)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +138,28 @@ func (s *Snapshots) FileContent(ctx context.Context, snapshotID, path string, ma
 	defer func() { _ = file.Close() }()
 
 	return io.ReadAll(io.LimitReader(file, maxSize))
+}
+
+func (s *Snapshots) ExtractFile(ctx context.Context, snapshotID, path, directory string) (string, error) {
+	handler, err := s.session.current()
+	if err != nil {
+		return "", err
+	}
+
+	target, err := os.MkdirTemp(directory, "extract-*")
+	if err != nil {
+		return "", fmt.Errorf("create extraction directory: %w", err)
+	}
+
+	return restoreSingleFile(ctx, handler, snapshotID, path, target)
+}
+
+func restoreSingleFile(ctx context.Context, handler *stowmark.Handler, snapshotID, path, directory string) (string, error) {
+	if err := handler.RestoreFile(ctx, snapshotID, path, &directory, nil); err != nil {
+		return "", err
+	}
+
+	return findSingleFile(directory)
 }
 
 func findSingleFile(directory string) (string, error) {

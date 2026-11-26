@@ -25,15 +25,34 @@ type Model struct {
 	cancelOperation context.CancelFunc
 	message         string
 	err             error
+	openDirectory   string
+	opener          FileOpener
 }
 
-func New(ctx context.Context, handlers *app.Handlers) Model {
-	return Model{
+type FileOpener func(path string) error
+
+type Option func(*Model)
+
+func WithFileOpener(directory string, opener FileOpener) Option {
+	return func(m *Model) {
+		m.openDirectory = directory
+		m.opener = opener
+	}
+}
+
+func New(ctx context.Context, handlers *app.Handlers, options ...Option) Model {
+	model := Model{
 		ctx:       ctx,
 		handlers:  *handlers,
 		snapshots: newSnapshotsScreen(),
 		loading:   true,
 	}
+
+	for _, option := range options {
+		option(&model)
+	}
+
+	return model
 }
 
 func (m *Model) Init() tea.Cmd {

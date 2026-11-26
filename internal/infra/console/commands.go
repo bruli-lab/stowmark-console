@@ -84,17 +84,42 @@ func (m *Model) openSnapshot(snapshotID string) tea.Cmd {
 func (m *Model) loadFileContent(request filePreviewRequested) tea.Cmd {
 	handler := m.handlers.GetFileContent
 	return m.startOperation("Reading "+request.name+"...", func(ctx context.Context) tea.Msg {
+		limit := previewLimit(request.name)
 		content, err := handler.Handle(ctx, app.GetFileContentQuery{
 			SnapshotID: request.snapshotID,
 			Path:       request.file.Path(),
-			MaxSize:    maxPreviewSize,
+			MaxSize:    limit,
 		})
+		if err != nil {
+			return fileContentLoadedMsg{request: request, err: err}
+		}
 		return fileContentLoadedMsg{
 			request:   request,
-			content:   content,
-			truncated: request.file.Size() > maxPreviewSize,
-			err:       err,
+			content:   classifyContent(content),
+			truncated: request.file.Size() > limit,
 		}
+	})
+}
+
+func (m *Model) openFile(request filePreviewRequested) tea.Cmd {
+	if m.opener == nil {
+		m.message = "Opening files is not available"
+		return nil
+	}
+
+	handler := m.handlers.ExtractFile
+	directory := m.openDirectory
+	opener := m.opener
+	return m.startOperation("Extracting "+request.name+"...", func(ctx context.Context) tea.Msg {
+		event, err := handler.Handle(ctx, app.ExtractFileCommand{
+			SnapshotID: request.snapshotID,
+			Path:       request.file.Path(),
+			Directory:  directory,
+		})
+		if err == nil {
+			err = opener(event.Location)
+		}
+		return fileOpenedMsg{name: request.name, err: err}
 	})
 }
 

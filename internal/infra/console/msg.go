@@ -39,9 +39,14 @@ type manifestLoadedMsg struct {
 
 type fileContentLoadedMsg struct {
 	request   filePreviewRequested
-	content   []byte
+	content   previewContent
 	truncated bool
 	err       error
+}
+
+type fileOpenedMsg struct {
+	name string
+	err  error
 }
 
 type snapshotCreatedMsg struct {

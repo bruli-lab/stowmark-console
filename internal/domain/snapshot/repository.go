@@ -9,4 +9,5 @@ type Repository interface {
 	Verify(ctx context.Context, snapshotID string) ([]Failure, error)
 	Restore(ctx context.Context, snapshotID, destination string) ([]Failure, error)
 	FileContent(ctx context.Context, snapshotID, path string, maxSize int64) ([]byte, error)
+	ExtractFile(ctx context.Context, snapshotID, path, directory string) (string, error)
 }

@@ -44,7 +44,7 @@ func (s *filesScreen) location() string {
 }
 
 func (s *filesScreen) help() string {
-	return "↑↓ Navigate   ↵ Open   [esc] Back   [v] Verify   [x] Restore   [r] Refresh"
+	return "↑↓ Navigate   ↵ Preview   [o] Open   [esc] Back   [v] Verify   [x] Restore   [r] Refresh"
 }
 
 func (s *filesScreen) resize(width, height int) {
@@ -106,6 +106,13 @@ func (s *filesScreen) update(msg tea.KeyPressMsg) tea.Cmd {
 
 	case "r":
 		return emit(snapshotOpenRequested{snapshotID: s.snapshotID()})
+
+	case "o":
+		request, ok := s.selectedFile()
+		if !ok {
+			return nil
+		}
+		return emit(fileOpenRequested{request: request})
 	}
 
 	var cmd tea.Cmd
@@ -125,17 +132,31 @@ func (s *filesScreen) open() tea.Cmd {
 		return nil
 	}
 
-	file, found := s.manifest.FileAt(s.directory, entry.Name())
+	request, found := s.selectedFile()
 	if !found {
 		return nil
 	}
 
-	return emit(filePreviewRequested{
+	return emit(request)
+}
+
+func (s *filesScreen) selectedFile() (filePreviewRequested, bool) {
+	entry, ok := s.selected()
+	if !ok || entry.IsDir() {
+		return filePreviewRequested{}, false
+	}
+
+	file, found := s.manifest.FileAt(s.directory, entry.Name())
+	if !found {
+		return filePreviewRequested{}, false
+	}
+
+	return filePreviewRequested{
 		snapshotID: s.snapshotID(),
 		location:   path.Join(s.snapshotID(), s.directory, entry.Name()),
 		name:       entry.Name(),
 		file:       file,
-	})
+	}, true
 }
 
 func (s *filesScreen) view() string {

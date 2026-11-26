@@ -10,22 +10,28 @@ import (
 )
 
 type previewScreen struct {
-	path      string
-	title     string
+	request   filePreviewRequested
+	content   previewContent
 	truncated bool
 	viewport  viewport.Model
 	width     int
+	height    int
 }
 
-func newPreviewScreen(location, name string, content []byte, truncated bool) *previewScreen {
-	text := strings.TrimSuffix(strings.ToValidUTF8(string(content), ""), "\n")
-	lines := strings.Split(strings.ReplaceAll(text, "\t", "    "), "\n")
-
+func newPreviewScreen(request filePreviewRequested, content *previewContent, truncated bool) *previewScreen {
 	model := viewport.New()
-	model.SetContentLines(lines)
-	model.LeftGutterFunc = lineNumberGutter(len(strconv.Itoa(len(lines))))
 
-	return &previewScreen{path: location, title: name, truncated: truncated, viewport: model}
+	switch content.kind {
+	case textPreview:
+		lines := textLines(content.data)
+		model.SetContentLines(lines)
+		model.LeftGutterFunc = lineNumberGutter(len(strconv.Itoa(len(lines))))
+	case binaryPreview:
+		model.SetContentLines(hexLines(content.data))
+	case imagePreview:
+	}
+
+	return &previewScreen{request: request, content: *content, truncated: truncated, viewport: model}
 }
 
 func lineNumberGutter(numberWidth int) viewport.GutterFunc {
@@ -43,23 +49,38 @@ func (s *previewScreen) name() string {
 }
 
 func (s *previewScreen) location() string {
-	return s.path
+	return s.request.location
 }
 
 func (s *previewScreen) help() string {
-	return "↑↓ Scroll   ←→ Pan   [pgup/pgdown] Page   [g/G] Top/Bottom   [esc] Close"
+	if s.content.kind == imagePreview {
+		return "[o] Open with the system application   [esc] Close"
+	}
+
+	return "↑↓ Scroll   ←→ Pan   [pgup/pgdown] Page   [g/G] Top/Bottom   [o] Open   [esc] Close"
 }
 
 func (s *previewScreen) resize(width, height int) {
-	s.width = width
+	if width == s.width && height == s.height {
+		return
+	}
+
+	s.width, s.height = width, height
+	viewportHeight := max(1, height-screenTitleHeight)
 	s.viewport.SetWidth(width)
-	s.viewport.SetHeight(max(1, height-screenTitleHeight))
+	s.viewport.SetHeight(viewportHeight)
+
+	if s.content.kind == imagePreview {
+		s.viewport.SetContentLines(imageLines(s.content.image, width, viewportHeight))
+	}
 }
 
 func (s *previewScreen) update(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case "esc", "backspace", "q":
 		return emit(screenCloseRequested{})
+	case "o":
+		return emit(fileOpenRequested{request: s.request})
 	case "home", "g":
 		s.viewport.GotoTop()
 		return nil
@@ -75,10 +96,32 @@ func (s *previewScreen) update(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 func (s *previewScreen) view() string {
-	title := headerStyle.Render(s.title)
-	if s.truncated {
-		title += "  " + mutedStyle.Render(fmt.Sprintf("(showing the first %s)", formatSize(maxPreviewSize)))
+	title := headerStyle.Render(s.request.name)
+	if description := s.description(); description != "" {
+		title += "  " + mutedStyle.Render(description)
 	}
 
 	return truncate(title, s.width) + "\n\n" + s.viewport.View()
+}
+
+func (s *previewScreen) description() string {
+	var parts []string
+
+	switch s.content.kind {
+	case imagePreview:
+		parts = append(parts, fmt.Sprintf("%s image, %d×%d", s.content.format, s.content.width, s.content.height))
+	case binaryPreview:
+		parts = append(parts, "binary file, hexadecimal view")
+	case textPreview:
+	}
+
+	if s.truncated {
+		parts = append(parts, "showing the first "+formatSize(previewLimit(s.request.name)))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return "(" + strings.Join(parts, ", ") + ")"
 }

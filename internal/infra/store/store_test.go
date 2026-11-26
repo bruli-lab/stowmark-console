@@ -3,6 +3,7 @@ package store_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
@@ -110,6 +111,23 @@ func exerciseRepository(t *testing.T, repositoryURL string) {
 
 		require.NoError(t, err)
 		require.Equal(t, "hello", string(content))
+	})
+
+	t.Run(`Given a snapshot
+	When one of its files is extracted to a directory
+	Then the whole file is written inside that directory`, func(t *testing.T) {
+		directory := t.TempDir()
+
+		location, err := snapshots.ExtractFile(t.Context(), snapshotID, filepath.Join(source, "README.txt"), directory)
+
+		require.NoError(t, err)
+		require.True(t, strings.HasPrefix(location, directory))
+		require.Equal(t, "README.txt", filepath.Base(location))
+		extracted, err := os.ReadFile(location)
+		require.NoError(t, err)
+		original, err := os.ReadFile(filepath.Join(source, "README.txt"))
+		require.NoError(t, err)
+		require.Equal(t, original, extracted)
 	})
 
 	t.Run(`Given a snapshot
