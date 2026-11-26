@@ -32,17 +32,11 @@ func (m *Model) finishOperation() {
 	}
 }
 
-func (m *Model) openInitialRepository() tea.Cmd {
-	list := m.handlers.ListRepositories
-	open := m.handlers.OpenRepository
-	return m.startOperation("Opening repository...", func(ctx context.Context) tea.Msg {
-		profiles, err := list.Handle(ctx, app.ListRepositoriesQuery{})
-		if err != nil {
-			return repositoryOpenedMsg{err: err}
-		}
-		name := profiles[0].Name()
-		event, err := open.Handle(ctx, app.OpenRepositoryCommand{Name: name})
-		return repositoryOpenedMsg{profiles: profiles, name: name, event: event, err: err}
+func (m *Model) loadRepositories() tea.Cmd {
+	handler := m.handlers.ListRepositories
+	return m.startOperation("Loading repositories...", func(ctx context.Context) tea.Msg {
+		profiles, err := handler.Handle(ctx, app.ListRepositoriesQuery{})
+		return repositoriesLoadedMsg{profiles: profiles, err: err}
 	})
 }
 

@@ -37,7 +37,7 @@ func New(ctx context.Context, handlers *app.Handlers) Model {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return m.openInitialRepository()
+	return m.loadRepositories()
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -139,6 +139,10 @@ func (m *Model) showManifest(manifest snapshot.Manifest) {
 	}
 
 	m.push(newFilesScreen(manifest))
+}
+
+func (m *Model) connected() bool {
+	return m.current.Name() != ""
 }
 
 func (m *Model) showRepositories() {

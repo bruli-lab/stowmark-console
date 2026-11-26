@@ -122,7 +122,7 @@ repositories:
 | `compression`, `compression_level` | no | Same as `STOWMARK_COMPRESSION` and `STOWMARK_COMPRESSION_LEVEL` |
 | `env` | no | Environment variables set while the repository is open, such as the credentials of a remote backend |
 
-When `STOWMARK_REPOSITORY` is set, it is added first as the `default` repository with the options of the environment variables. The console opens the first repository on start. `:repo` lists them all, marks the current one and opens the selected one: its `env` variables replace those of the previous repository. Keep the file readable only by you (`chmod 600`) when it holds credentials.
+When `STOWMARK_REPOSITORY` is set, it is added first as the `default` repository with the options of the environment variables. With a single repository, the console opens it on start. With several, it starts on the repositories list so you can choose which one to open. `:repo` lists them all again, marks the current one and opens the selected one: its `env` variables replace those of the previous repository. Keep the file readable only by you (`chmod 600`) when it holds credentials.
 
 ### Configuration
 

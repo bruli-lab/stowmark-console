@@ -652,15 +652,60 @@ func TestTruncate(t *testing.T) {
 func TestConsoleRepositories(t *testing.T) {
 	t.Parallel()
 
-	t.Run(`Given several configured repositories
+	const nasLocation = "smb://user@nas/backups"
+
+	t.Run(`Given a single configured repository
 	When the console starts
-	Then the first one is opened and shown in the header`, func(t *testing.T) {
+	Then it is opened directly and shown in the header`, func(t *testing.T) {
 		t.Parallel()
-		h := newHarness(t, true).withRepository("nas", "smb://user@nas/backups").started()
+		h := newHarness(t, true).started()
 
 		require.Equal(t, "default", h.catalog.OpenCalls()[0].Name)
-		require.Equal(t, "default", h.model.current.Name())
+		require.Equal(t, h.model.snapshots, h.model.top())
 		require.Contains(t, h.view(), "default")
+	})
+
+	t.Run(`Given several configured repositories
+	When the console starts
+	Then the repositories are listed without opening any`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).withRepository("nas", nasLocation).started()
+
+		require.NotNil(t, h.repositoriesScreen())
+		require.Empty(t, h.catalog.OpenCalls())
+		require.Contains(t, h.view(), "Choose the repository to open")
+		require.Contains(t, h.view(), nasLocation)
+	})
+
+	t.Run(`Given the repositories list at startup
+	When the user chooses one
+	Then it is opened and its snapshots are listed`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).withRepository("nas", nasLocation).started()
+		h.pressAndRun(runes("j"))
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Equal(t, "nas", h.catalog.OpenCalls()[0].Name)
+		require.Equal(t, "nas", h.model.current.Name())
+		require.Equal(t, h.model.snapshots, h.model.top())
+		require.Len(t, h.snapshots.ListCalls(), 1)
+	})
+
+	t.Run(`Given the repositories list at startup
+	When the user tries to go back or to the snapshots
+	Then the list stays until a repository is chosen`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).withRepository("nas", nasLocation).started()
+
+		h.pressAndRun(key(tea.KeyEsc))
+		h.pressAndRun(runes(":"))
+		h.typeText("snap")
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.NotNil(t, h.repositoriesScreen())
+		require.Equal(t, "Choose a repository first", h.model.message)
+		require.Empty(t, h.snapshots.ListCalls())
 	})
 
 	t.Run(`Given no configured repositories
@@ -676,11 +721,12 @@ func TestConsoleRepositories(t *testing.T) {
 		require.Empty(t, h.catalog.OpenCalls())
 	})
 
-	t.Run(`Given the snapshots list
+	t.Run(`Given an open repository
 	When the user enters the repositories command
-	Then the configured repositories are listed with the current one selected`, func(t *testing.T) {
+	Then the repositories are listed with the current one selected`, func(t *testing.T) {
 		t.Parallel()
-		h := newHarness(t, true).withRepository("nas", "smb://user@nas/backups").started()
+		h := newHarness(t, true).withRepository("nas", nasLocation).started()
+		h.pressAndRun(key(tea.KeyEnter))
 		h.pressAndRun(runes(":"))
 		h.typeText("repo")
 
@@ -689,33 +735,31 @@ func TestConsoleRepositories(t *testing.T) {
 		require.NotNil(t, h.repositoriesScreen())
 		selected, _ := h.repositoriesScreen().selected()
 		require.Equal(t, "default", selected.Name())
-		require.Contains(t, h.view(), "smb")
+		require.Contains(t, h.view(), currentMarker+"default")
 	})
 
-	t.Run(`Given the repositories list
-	When the user opens another repository
-	Then it becomes the current one and its snapshots are listed`, func(t *testing.T) {
+	t.Run(`Given the repositories list of an open repository
+	When the user goes back
+	Then the snapshots of the current repository are shown`, func(t *testing.T) {
 		t.Parallel()
-		h := newHarness(t, true).withRepository("nas", "smb://user@nas/backups").started()
+		h := newHarness(t, true).withRepository("nas", nasLocation).started()
+		h.pressAndRun(key(tea.KeyEnter))
 		h.pressAndRun(runes(":"))
 		h.typeText("repo")
 		h.pressAndRun(key(tea.KeyEnter))
-		h.pressAndRun(runes("j"))
 
-		h.pressAndRun(key(tea.KeyEnter))
+		h.pressAndRun(key(tea.KeyEsc))
 
-		require.Equal(t, "nas", h.catalog.OpenCalls()[1].Name)
-		require.Equal(t, "nas", h.model.current.Name())
 		require.Equal(t, h.model.snapshots, h.model.top())
-		require.Len(t, h.repositories.InitializedCalls(), 2)
-		require.Len(t, h.snapshots.ListCalls(), 2)
+		require.Len(t, h.catalog.OpenCalls(), 1)
 	})
 
-	t.Run(`Given the repositories list
+	t.Run(`Given an open repository
 	When the repository chosen cannot be opened
 	Then the error is shown and the current repository is kept`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).withRepository("nas", "broken://nas").started()
+		h.pressAndRun(key(tea.KeyEnter))
 		h.pressAndRun(runes(":"))
 		h.typeText("repo")
 		h.pressAndRun(key(tea.KeyEnter))
@@ -728,26 +772,12 @@ func TestConsoleRepositories(t *testing.T) {
 		require.NotNil(t, h.repositoriesScreen())
 	})
 
-	t.Run(`Given the repositories list
-	When the user goes back
-	Then the snapshots of the current repository are shown`, func(t *testing.T) {
-		t.Parallel()
-		h := newHarness(t, true).withRepository("nas", "smb://user@nas/backups").started()
-		h.pressAndRun(runes(":"))
-		h.typeText("repo")
-		h.pressAndRun(key(tea.KeyEnter))
-
-		h.pressAndRun(key(tea.KeyEsc))
-
-		require.Equal(t, h.model.snapshots, h.model.top())
-		require.Len(t, h.catalog.OpenCalls(), 1)
-	})
-
 	t.Run(`Given several repositories and one that is not initialized
 	When the user declines to initialize it
 	Then the repositories list is shown instead of quitting`, func(t *testing.T) {
 		t.Parallel()
-		h := newHarness(t, false).withRepository("nas", "smb://user@nas/backups").started()
+		h := newHarness(t, false).withRepository("nas", nasLocation).started()
+		h.pressAndRun(key(tea.KeyEnter))
 
 		cmd := h.press(runes("n"))
 		require.False(t, isQuit(cmd))

@@ -51,6 +51,10 @@ func (s *repositoriesScreen) location() string {
 }
 
 func (s *repositoriesScreen) help() string {
+	if s.current == "" {
+		return "↑↓ Navigate   ↵ Open"
+	}
+
 	return "↑↓ Navigate   ↵ Open   [esc] Back"
 }
 
@@ -81,6 +85,9 @@ func (s *repositoriesScreen) update(msg tea.KeyPressMsg) tea.Cmd {
 		}
 
 	case "esc", "backspace", "left", "h", "q":
+		if s.current == "" {
+			return nil
+		}
 		return emit(screenCloseRequested{})
 	}
 
@@ -92,6 +99,9 @@ func (s *repositoriesScreen) update(msg tea.KeyPressMsg) tea.Cmd {
 
 func (s *repositoriesScreen) view() string {
 	title := headerStyle.Render(fmt.Sprintf("Repositories (%d)", len(s.profiles)))
+	if s.current == "" {
+		title += "  " + mutedStyle.Render("Choose the repository to open")
+	}
 
 	if len(s.profiles) == 0 {
 		return title + "\n\nNo repositories configured."

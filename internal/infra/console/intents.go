@@ -74,6 +74,10 @@ func (m *Model) handleIntent(msg tea.Msg) (tea.Cmd, bool) {
 	case screenCloseRequested:
 		m.pop()
 	case snapshotsScreenRequested:
+		if !m.connected() {
+			m.message = "Choose a repository first"
+			return nil, true
+		}
 		m.screens = nil
 	case repositoriesScreenRequested:
 		m.showRepositories()

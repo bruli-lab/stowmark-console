@@ -11,11 +11,19 @@ import (
 
 func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
+	case repositoriesLoadedMsg:
+		m.finishOperation()
+		if m.fail("load repositories", msg.err) {
+			return nil
+		}
+		m.repositories = msg.profiles
+		if len(m.repositories) == 1 {
+			return m.openRepository(m.repositories[0].Name())
+		}
+		m.showRepositories()
+
 	case repositoryOpenedMsg:
 		m.finishOperation()
-		if msg.profiles != nil {
-			m.repositories = msg.profiles
-		}
 		if m.fail("open repository "+msg.name, msg.err) {
 			return nil
 		}
