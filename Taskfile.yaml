@@ -2,6 +2,7 @@ version: '3'
 
 vars:
   GOLANGCI_LINT_VERSION: 'v2.13.1'
+  SANDBOX_DIR: '{{.ROOT_DIR}}/sandbox'
 
 silent: false
 
@@ -10,6 +11,14 @@ tasks:
     desc: Mostra l'ajuda
     cmds:
       - task --list
+
+  run:
+    desc: Arrancar la consola amb el repositori local del sandbox
+    interactive: true
+    env:
+      STOWMARK_REPOSITORY: '{{.SANDBOX_DIR}}/repository'
+    cmds:
+      - go run ./cmd/console
 
   fmt:
     desc: Format Go amb gofumpt
