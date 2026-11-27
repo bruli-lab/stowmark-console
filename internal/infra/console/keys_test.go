@@ -73,7 +73,7 @@ func TestConsoleEncryptedRepository(t *testing.T) {
 
 	t.Run(`Given an encrypted repository with its private key
 	When the console starts
-	Then the header shows the lock and the sidebar the private key and its fingerprint`, func(t *testing.T) {
+	Then the header shows the lock and the top panel the private key and its fingerprint`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true)
 		h.encrypted(t, 3, true)
@@ -88,7 +88,7 @@ func TestConsoleEncryptedRepository(t *testing.T) {
 
 	t.Run(`Given an encrypted repository
 	When the console starts
-	Then the sidebar lists the key rotation commands`, func(t *testing.T) {
+	Then the top panel lists the key rotation commands`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true)
 		h.encrypted(t, 3, true)
@@ -102,7 +102,7 @@ func TestConsoleEncryptedRepository(t *testing.T) {
 
 	t.Run(`Given an encrypted repository configured without its private key
 	When the console starts
-	Then the sidebar says that the private key is not set`, func(t *testing.T) {
+	Then the top panel says that the private key is not set`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true)
 		h.encrypted(t, 2, false)

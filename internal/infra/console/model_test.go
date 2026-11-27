@@ -721,7 +721,7 @@ func TestConsoleDialogsAndCommands(t *testing.T) {
 
 	t.Run(`Given an unencrypted repository
 	When the console starts
-	Then the sidebar lists the general commands but not the key rotation ones`, func(t *testing.T) {
+	Then the top panel lists the general commands but not the key rotation ones`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
 
@@ -899,27 +899,45 @@ func TestConsoleLayout(t *testing.T) {
 		require.Contains(t, view, "second failure")
 	})
 
-	t.Run(`Given a tall terminal
+	t.Run(`Given a tall and wide terminal
 	When the console is rendered
-	Then the sidebar shows the logo and the output fits the terminal`, func(t *testing.T) {
+	Then the top panel shows the logo at its full size and the output fits the terminal`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
-		h.model.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+		h.model.Update(tea.WindowSizeMsg{Width: 160, Height: 50})
 
 		view := h.view()
 
-		require.Contains(t, view, "▀")
+		require.Contains(t, view, stowmarkLogo()[:40])
+		require.Equal(t, 50, lipgloss.Height(view))
+		require.Equal(t, 160, lipgloss.Width(view))
+	})
+
+	t.Run(`Given a terminal shorter than the logo needs
+	When the console is rendered
+	Then the logo is hidden and the output fits the terminal`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.model.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
+
+		view := h.view()
+
+		require.NotContains(t, view, "▀")
 		require.Equal(t, 40, lipgloss.Height(view))
 	})
 
-	t.Run(`Given a short terminal
+	t.Run(`Given a tall terminal too narrow for the logo and every panel column
 	When the console is rendered
-	Then the logo is hidden`, func(t *testing.T) {
+	Then the logo is hidden and the output fits the terminal`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
-		h.model.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+		h.model.Update(tea.WindowSizeMsg{Width: 80, Height: 50})
 
-		require.NotContains(t, h.view(), "▀")
+		view := h.view()
+
+		require.NotContains(t, view, "▀")
+		require.Equal(t, 80, lipgloss.Width(view))
+		require.Equal(t, 50, lipgloss.Height(view))
 	})
 }
 
@@ -928,14 +946,13 @@ func TestLogoLines(t *testing.T) {
 
 	t.Run(`Given the embedded logo
 	When it is drawn
-	Then it uses two pixels per cell and fits the sidebar`, func(t *testing.T) {
+	Then it uses two pixels per cell`, func(t *testing.T) {
 		t.Parallel()
 
 		lines := strings.Split(stowmarkLogo(), "\n")
 
 		require.Len(t, lines, 12)
 		require.Equal(t, 18, ansi.StringWidth(lines[0]))
-		require.LessOrEqual(t, ansi.StringWidth(lines[0]), sidebarContentWidth)
 	})
 
 	t.Run(`Given an image with a transparent and an opaque pixel

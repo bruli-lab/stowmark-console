@@ -2,7 +2,7 @@ package console
 
 import "charm.land/lipgloss/v2"
 
-const sidebarContentWidth = 24
+const menuWidth = 18
 
 var (
 	colorPrimary   = lipgloss.Color("#7C5CFC")
@@ -30,28 +30,27 @@ var (
 				Foreground(colorMuted).
 				Background(colorSurface)
 
-	logoStyle = lipgloss.NewStyle().
-			Background(colorSurface).
-			Align(lipgloss.Center).
-			Width(sidebarContentWidth)
-
-	sidebarStyle = lipgloss.NewStyle().
+	panelStyle = lipgloss.NewStyle().
 			Background(colorSurface).
 			Foreground(colorText).
 			Padding(1, 2)
+
+	panelColumnStyle = lipgloss.NewStyle().
+				Background(colorSurface).
+				Foreground(colorText)
 
 	selectedMenuStyle = lipgloss.NewStyle().
 				Background(colorSelected).
 				Foreground(colorText).
 				Bold(true).
 				Padding(0, 1).
-				Width(sidebarContentWidth - 2)
+				Width(menuWidth)
 
 	menuStyle = lipgloss.NewStyle().
 			Foreground(colorMuted).
 			Background(colorSurface).
 			Padding(0, 1).
-			Width(sidebarContentWidth - 2)
+			Width(menuWidth)
 
 	contentStyle = lipgloss.NewStyle().
 			Foreground(colorText).

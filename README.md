@@ -152,7 +152,7 @@ The initialization options only apply when the console creates a new repository,
 
 A repository is encrypted when it is initialized with a public key. Reading it, creating snapshots and restoring them need the matching private key, so set both keys for the repository. Format version 3 is recommended for encrypted repositories: it also encrypts the manifests.
 
-- The header and the repositories list show a 🔒 for repositories configured with a key, and the sidebar shows the private key and its fingerprint (the same `SHA256:` fingerprint Stowmark stores in the repository).
+- The header and the repositories list show a 🔒 for repositories configured with a key, and the panel at the top shows the private key and its fingerprint (the same `SHA256:` fingerprint Stowmark stores in the repository).
 - A format version 3 repository opened without its private key is reported as such, instead of offering to initialize it. A wrong or unreadable private key gives an error that names the repository and the setting to fix.
 - The console refuses to create snapshots in a repository configured with a public key but no private key: Stowmark would store the new files without encryption in a format version 2 repository.
 - `:keygen` generates a key pair in a folder and shows the `public_key` / `private_key` lines to add to the repositories file.
@@ -209,7 +209,7 @@ The preview adapts to the content of the file:
 
 ### Command line
 
-Press `:` in any view, type a command and press `Enter`. While you type, the footer lists the matching commands and `Tab` completes the suggested one. `Esc` closes the command line. The sidebar also lists the main commands; `:rewrap` and `:rekey` only appear when the open repository is encrypted.
+Press `:` in any view, type a command and press `Enter`. While you type, the footer lists the matching commands and `Tab` completes the suggested one. `Esc` closes the command line. The panel at the top also lists the main commands; `:rewrap` and `:rekey` only appear when the open repository is encrypted.
 
 | Command | Action |
 | --- | --- |
