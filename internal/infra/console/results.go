@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
@@ -43,6 +42,9 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 
 	case encryptedRepositoryInitializedMsg:
 		return m.handleEncryptedInitialized(&msg)
+
+	case privateKeyUsedMsg:
+		return m.handlePrivateKeyUsed(&msg)
 
 	case repositoryInitializedMsg:
 		m.finishOperation()
@@ -139,10 +141,7 @@ func (m *Model) applyStatus(status repository.Status) tea.Cmd {
 	case repository.StatusUninitialized:
 		m.openInitConfirmation()
 	case repository.StatusKeyRequired:
-		m.err = explainKeyError(m.current, encryption.ErrPrivateKeyRequired)
-		if len(m.repositories) > 1 {
-			m.showRepositories()
-		}
+		m.explainMissingKey()
 	default:
 		return m.loadSnapshots("")
 	}

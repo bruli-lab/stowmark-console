@@ -165,7 +165,11 @@ func (m *Model) openKeygenDialog() {
 }
 
 func (m *Model) openKeyDialog(title, label, value string, chosen func(path string) tea.Msg) {
-	m.dialog = newPromptDialog(
+	m.dialog = newKeyFileDialog(title, label, value, chosen, emit(statusMessage{text: "Key change cancelled"}))
+}
+
+func newKeyFileDialog(title, label, value string, chosen func(path string) tea.Msg, onCancel tea.Cmd) *promptDialog {
+	return newPromptDialog(
 		title,
 		label,
 		value,
@@ -180,7 +184,7 @@ func (m *Model) openKeyDialog(title, label, value string, chosen func(path strin
 			}
 			return chosen(path), nil
 		},
-		emit(statusMessage{text: "Key change cancelled"}),
+		onCancel,
 	).withCompletion(keyFileSuggestions, describeKeyFile)
 }
 

@@ -58,6 +58,16 @@ func (h *harness) wide() *harness {
 	return h
 }
 
+func (h *harness) keyRequiredUntilKeyGiven() *harness {
+	h.repositories.StatusFunc = func(context.Context) (repository.Status, error) {
+		if len(h.catalog.UpdateCalls()) == 0 {
+			return repository.StatusKeyRequired, nil
+		}
+		return repository.StatusReady, nil
+	}
+	return h
+}
+
 func (h *harness) info() *infoDialog {
 	info, _ := h.model.dialog.(*infoDialog)
 	return info
@@ -114,20 +124,95 @@ func TestConsoleEncryptedRepository(t *testing.T) {
 
 	t.Run(`Given an encrypted format version 3 repository without its private key
 	When the console starts
-	Then it explains which setting needs the key instead of offering to initialize it`, func(t *testing.T) {
+	Then it explains which setting needs the key and asks for the private key file instead of offering to initialize it`, func(t *testing.T) {
 		t.Parallel()
-		h := newHarness(t, true)
-		h.repositories.StatusFunc = func(context.Context) (repository.Status, error) {
-			return repository.StatusKeyRequired, nil
-		}
+		h := newHarness(t, true).keyRequiredUntilKeyGiven()
 
 		h.started()
 
-		require.Nil(t, h.model.dialog)
+		require.NotNil(t, h.prompt())
+		require.Equal(t, "Private key of default", h.prompt().title)
+		require.Contains(t, h.view(), "STOWMARK_PRIVATE_KEY")
 		require.Empty(t, h.snapshots.ListCalls())
 		require.ErrorIs(t, h.model.err, encryption.ErrPrivateKeyRequired)
 		require.ErrorContains(t, h.model.err, `repository "default" is encrypted and needs its private key`)
 		require.ErrorContains(t, h.model.err, "STOWMARK_PRIVATE_KEY")
+	})
+
+	t.Run(`Given the private key prompt of a repository that needs its key
+	When the user gives the private key file
+	Then the session opens the repository with it, lists the snapshots and shows the setting to keep it`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).keyRequiredUntilKeyGiven()
+		keys := writeKeyPair(t, t.TempDir(), "1234")
+		h.started()
+		h.clearInput()
+		h.typeText(keys.privateKey)
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Equal(t, keys.privateKey, *h.catalog.UpdateCalls()[0].Profile.PrivateKey())
+		require.Equal(t, keys.privateKey, *h.model.current.PrivateKey())
+		require.NoError(t, h.model.err)
+		require.Len(t, h.snapshots.ListCalls(), 1)
+		require.NotNil(t, h.info())
+		require.Contains(t, h.info().body, "STOWMARK_PRIVATE_KEY="+keys.privateKey)
+	})
+
+	t.Run(`Given the private key prompt of a repository of the repositories file
+	When the user gives the private key file
+	Then it shows the private_key line to add to its entry`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).keyRequiredUntilKeyGiven()
+		h.profiles[0] = repository.NewProfile("vault", h.profiles[0].Location(), h.profiles[0].Init())
+		keys := writeKeyPair(t, t.TempDir(), "1234")
+		h.started()
+		h.clearInput()
+		h.typeText(keys.privateKey)
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Contains(t, h.info().body, "private_key: "+keys.privateKey)
+		require.NotContains(t, h.info().body, "STOWMARK_PRIVATE_KEY")
+	})
+
+	t.Run(`Given the private key prompt
+	When the user gives a key that does not open the repository
+	Then the error names the key and the prompt asks again`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true)
+		h.repositories.StatusFunc = func(context.Context) (repository.Status, error) {
+			if len(h.catalog.UpdateCalls()) == 0 {
+				return repository.StatusKeyRequired, nil
+			}
+			return repository.StatusUninitialized, encryption.ErrWrongPrivateKey
+		}
+		keys := writeKeyPair(t, t.TempDir(), "1234")
+		h.started()
+		h.clearInput()
+		h.typeText(keys.privateKey)
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.ErrorIs(t, h.model.err, encryption.ErrWrongPrivateKey)
+		require.ErrorContains(t, h.model.err, keys.privateKey)
+		require.NotNil(t, h.prompt())
+		require.Contains(t, h.prompt().err, "does not open repository")
+		require.Empty(t, h.snapshots.ListCalls())
+	})
+
+	t.Run(`Given the private key prompt
+	When the user cancels it
+	Then the explanation of the setting to change stays`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).keyRequiredUntilKeyGiven()
+		h.started()
+
+		h.pressAndRun(key(tea.KeyEscape))
+
+		require.Nil(t, h.model.dialog)
+		require.ErrorIs(t, h.model.err, encryption.ErrPrivateKeyRequired)
+		require.Empty(t, h.catalog.UpdateCalls())
 	})
 
 	t.Run(`Given several repositories and one that needs its private key
