@@ -62,6 +62,9 @@ func newHarness(t *testing.T, initialized bool) *harness {
 	h := &harness{}
 	repositories.UnlockFunc = func(context.Context, bool) (repository.LockReport, error) { return h.lockReport, nil }
 	snapshots := &mocks.SnapshotRepositoryMock{
+		CreateFunc: func(context.Context, *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error) {
+			return fixtures.Snapshot().WithID("new-snapshot").Build(), nil, nil
+		},
 		ListFunc: func(context.Context) ([]snapshot.Snapshot, error) {
 			return []snapshot.Snapshot{fixtures.Snapshot().WithID(snapshotID).Build()}, nil
 		},
@@ -598,8 +601,8 @@ func TestConsoleOperations(t *testing.T) {
 		source := t.TempDir()
 		h := newHarness(t, true).started()
 		created := fixtures.Snapshot().WithID("new-snapshot").Build()
-		h.snapshots.CreateFunc = func(context.Context, *snapshot.Creation) (snapshot.Snapshot, error) {
-			return created, nil
+		h.snapshots.CreateFunc = func(context.Context, *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error) {
+			return created, nil, nil
 		}
 		h.snapshots.ListFunc = func(context.Context) ([]snapshot.Snapshot, error) {
 			return []snapshot.Snapshot{fixtures.Snapshot().WithID(snapshotID).Build(), created}, nil
@@ -607,6 +610,7 @@ func TestConsoleOperations(t *testing.T) {
 		h.pressAndRun(runes("c"))
 		h.clearInput()
 		h.typeText(source)
+		h.pressAndRun(key(tea.KeyEnter))
 
 		h.pressAndRun(key(tea.KeyEnter))
 

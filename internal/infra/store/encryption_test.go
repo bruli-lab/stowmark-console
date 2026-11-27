@@ -32,7 +32,7 @@ func newEncryptedRepository(t *testing.T, formatVersion int) encryptedRepository
 	defer func() { require.NoError(t, session.Close()) }()
 
 	require.NoError(t, store.NewRepositories(session).Initialize(t.Context(), setup.initOptions()))
-	created, err := store.NewSnapshots(session).Create(t.Context(), creation(t, source))
+	created, _, err := store.NewSnapshots(session).Create(t.Context(), creation(t, source))
 	require.NoError(t, err)
 
 	return encryptedRepository{location: location, source: source, snapshotID: created.ID(), keys: keys}
@@ -135,7 +135,7 @@ func TestStoreCatalogWithEncryptedRepository(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expected, profile.Fingerprint())
 
-		_, err = store.NewSnapshots(session).Create(t.Context(), creation(t, v2.source))
+		_, _, err = store.NewSnapshots(session).Create(t.Context(), creation(t, v2.source))
 
 		require.ErrorIs(t, err, encryption.ErrPrivateKeyRequired)
 	})
@@ -147,7 +147,7 @@ func TestStoreCatalogWithEncryptedRepository(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expected, profile.Fingerprint())
 
-		_, err = store.NewSnapshots(session).Create(t.Context(), creation(t, v2.source))
+		_, _, err = store.NewSnapshots(session).Create(t.Context(), creation(t, v2.source))
 
 		require.NoError(t, err)
 	})

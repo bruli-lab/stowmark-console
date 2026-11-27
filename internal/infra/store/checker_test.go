@@ -38,7 +38,7 @@ func TestStoreChecker(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, session.Close()) })
 	require.NoError(t, store.NewRepositories(session).Initialize(t.Context(), repository.NewInitOptions("none", nil, nil)))
-	created, err := store.NewSnapshots(session).Create(t.Context(), creation(t, source))
+	created, _, err := store.NewSnapshots(session).Create(t.Context(), creation(t, source))
 	require.NoError(t, err)
 	checker := store.NewChecker(session)
 
@@ -121,7 +121,7 @@ func TestStoreCheckerEncrypted(t *testing.T) {
 	writer, err := store.Open(t.Context(), repositoryPath, setup.privateKey)
 	require.NoError(t, err)
 	require.NoError(t, store.NewRepositories(writer).Initialize(t.Context(), setup.initOptions()))
-	_, err = store.NewSnapshots(writer).Create(t.Context(), creation(t, writeSource(t)))
+	_, _, err = store.NewSnapshots(writer).Create(t.Context(), creation(t, writeSource(t)))
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
 

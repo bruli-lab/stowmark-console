@@ -129,10 +129,11 @@ func (m *Model) openFile(request filePreviewRequested) tea.Cmd {
 	})
 }
 
-func (m *Model) createSnapshot(source string) tea.Cmd {
+func (m *Model) createSnapshot(source string, exclusions snapshot.Exclusions) tea.Cmd {
 	bus := m.buses.Commands
 	return m.startOperation("Creating snapshot of "+source+"...", func(ctx context.Context) tea.Msg {
-		event, err := dispatch[snapshot.Created](ctx, bus, app.CreateSnapshotCommand{Source: source})
+		command := app.CreateSnapshotCommand{Source: source, Exclusions: exclusions}
+		event, err := dispatch[snapshot.Created](ctx, bus, command)
 		return snapshotCreatedMsg{event: event, err: err}
 	})
 }

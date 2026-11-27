@@ -25,7 +25,7 @@ func TestStoreRetention(t *testing.T) {
 	var newest string
 	for _, content := range []string{"first version", "second version", "third version"} {
 		require.NoError(t, os.WriteFile(filepath.Join(source, "README.txt"), []byte(content), 0o600))
-		created, err := snapshots.Create(t.Context(), creation(t, source))
+		created, _, err := snapshots.Create(t.Context(), creation(t, source))
 		require.NoError(t, err)
 		newest = created.ID()
 	}

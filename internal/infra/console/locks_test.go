@@ -99,12 +99,13 @@ func TestConsoleLocks(t *testing.T) {
 	Then the error names the holder and suggests the unlock commands`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true).started()
-		h.snapshots.CreateFunc = func(context.Context, *snapshot.Creation) (snapshot.Snapshot, error) {
-			return snapshot.Snapshot{}, fmt.Errorf("%w: exclusive lock held by nas (pid 42)", repository.ErrLocked)
+		h.snapshots.CreateFunc = func(context.Context, *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error) {
+			return snapshot.Snapshot{}, nil, fmt.Errorf("%w: exclusive lock held by nas (pid 42)", repository.ErrLocked)
 		}
 		h.pressAndRun(runes("c"))
 		h.clearInput()
 		h.typeText(t.TempDir())
+		h.pressAndRun(key(tea.KeyEnter))
 
 		h.pressAndRun(key(tea.KeyEnter))
 

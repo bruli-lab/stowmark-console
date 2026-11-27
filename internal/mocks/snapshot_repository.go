@@ -19,7 +19,7 @@ var _ snapshot.Repository = &SnapshotRepositoryMock{}
 //
 //		// make and configure a mocked snapshot.Repository
 //		mockedRepository := &SnapshotRepositoryMock{
-//			CreateFunc: func(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, error) {
+//			CreateFunc: func(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error) {
 //				panic("mock out the Create method")
 //			},
 //			ExtractFileFunc: func(ctx context.Context, extraction *snapshot.FileExtraction) (string, error) {
@@ -48,7 +48,7 @@ var _ snapshot.Repository = &SnapshotRepositoryMock{}
 //	}
 type SnapshotRepositoryMock struct {
 	// CreateFunc mocks the Create method.
-	CreateFunc func(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, error)
+	CreateFunc func(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error)
 
 	// ExtractFileFunc mocks the ExtractFile method.
 	ExtractFileFunc func(ctx context.Context, extraction *snapshot.FileExtraction) (string, error)
@@ -132,7 +132,7 @@ type SnapshotRepositoryMock struct {
 }
 
 // Create calls CreateFunc.
-func (mock *SnapshotRepositoryMock) Create(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, error) {
+func (mock *SnapshotRepositoryMock) Create(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error) {
 	if mock.CreateFunc == nil {
 		panic("SnapshotRepositoryMock.CreateFunc: method is nil but Repository.Create was just called")
 	}

@@ -54,7 +54,7 @@ func TestStoreLocks(t *testing.T) {
 	t.Run(`Given a repository with an active exclusive lock
 	When a snapshot is created
 	Then it fails with a locked error that names the holder`, func(t *testing.T) {
-		_, err := snapshots.Create(t.Context(), creation(t, source))
+		_, _, err := snapshots.Create(t.Context(), creation(t, source))
 
 		require.ErrorIs(t, err, repository.ErrLocked)
 		require.ErrorContains(t, err, "backup-host (pid 4242)")
@@ -67,7 +67,7 @@ func TestStoreLocks(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, repository.LockReport{Removed: 1, Active: 0}, report)
 
-		_, err = snapshots.Create(t.Context(), creation(t, source))
+		_, _, err = snapshots.Create(t.Context(), creation(t, source))
 
 		require.NoError(t, err)
 	})

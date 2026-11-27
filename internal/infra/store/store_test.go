@@ -109,7 +109,7 @@ func exerciseRepository(t *testing.T, repositoryURL string, setup repositorySetu
 	t.Run(`Given an initialized repository
 	When a snapshot of a directory is created
 	Then it is listed with its source, files and size`, func(t *testing.T) {
-		created, err := snapshots.Create(t.Context(), creation(t, source))
+		created, _, err := snapshots.Create(t.Context(), creation(t, source))
 		require.NoError(t, err)
 		snapshotID = created.ID()
 
@@ -127,7 +127,7 @@ func exerciseRepository(t *testing.T, repositoryURL string, setup repositorySetu
 	t.Run(`Given a source that is already stored
 	When a second snapshot of it is created
 	Then the created snapshot reports every file of the source, not only the new ones`, func(t *testing.T) {
-		created, err := snapshots.Create(t.Context(), creation(t, source))
+		created, _, err := snapshots.Create(t.Context(), creation(t, source))
 
 		require.NoError(t, err)
 		require.Equal(t, 2, created.FileCount())
@@ -207,7 +207,7 @@ func exerciseRepository(t *testing.T, repositoryURL string, setup repositorySetu
 func creation(t *testing.T, source string) *snapshot.Creation {
 	t.Helper()
 
-	created, err := snapshot.NewCreation(source)
+	created, err := snapshot.NewCreation(source, snapshot.Exclusions{})
 	require.NoError(t, err)
 
 	return created

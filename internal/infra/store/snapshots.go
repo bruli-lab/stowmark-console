@@ -57,24 +57,28 @@ func (s *Snapshots) Manifest(ctx context.Context, snapshotID string) (snapshot.M
 	return snapshot.NewManifest(manifest.ID, manifest.Source, regularFiles(manifest)), nil
 }
 
-func (s *Snapshots) Create(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, error) {
+func (s *Snapshots) Create(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error) {
 	handler, err := s.session.current()
 	if err != nil {
-		return snapshot.Snapshot{}, err
+		return snapshot.Snapshot{}, nil, err
 	}
 
 	if err := s.session.writable(); err != nil {
-		return snapshot.Snapshot{}, err
+		return snapshot.Snapshot{}, nil, err
 	}
 
-	result, err := handler.CreateSnapshot(ctx, creation.Source(), nil)
+	exclusions := creation.Exclusions()
+	result, err := handler.CreateSnapshotWithOptions(ctx, creation.Source(), stowmark.CreateOptions{
+		Exclude:         exclusions.Patterns(),
+		SkipIgnoreFiles: exclusions.SkipsIgnoreFiles(),
+	})
 	if err != nil {
-		return snapshot.Snapshot{}, translate(err)
+		return snapshot.Snapshot{}, nil, translate(err)
 	}
 
 	manifest, err := handler.GetManifest(ctx, result.ID)
 	if err != nil {
-		return snapshot.Snapshot{}, translate(err)
+		return snapshot.Snapshot{}, nil, translate(err)
 	}
 
 	files := regularFiles(manifest)
@@ -84,7 +88,12 @@ func (s *Snapshots) Create(ctx context.Context, creation *snapshot.Creation) (sn
 		totalSize += files[i].Size()
 	}
 
-	return snapshot.New(result.ID, manifest.CreatedAt, len(files), totalSize, manifest.Source), nil
+	skipped := make([]snapshot.SkippedFile, len(result.SkippedFiles))
+	for i, file := range result.SkippedFiles {
+		skipped[i] = snapshot.SkippedFile{Path: file.Path, Kind: file.Kind}
+	}
+
+	return snapshot.New(result.ID, manifest.CreatedAt, len(files), totalSize, manifest.Source), skipped, nil
 }
 
 func (s *Snapshots) Verify(ctx context.Context, verification *snapshot.Verification) ([]snapshot.Failure, error) {

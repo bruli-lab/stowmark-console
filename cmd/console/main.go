@@ -13,6 +13,7 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/config"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
+	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/infra/console"
 	"github.com/bruli-lab/stowmark-console/internal/infra/desktop"
 	"github.com/bruli-lab/stowmark-console/internal/infra/stderr"
@@ -102,7 +103,9 @@ func catalogEntries(repositories []config.Repository) []store.Entry {
 				repo.URL,
 				repository.NewInitOptions(repo.Compression, repo.CompressionLevel, repo.PublicKey).
 					WithFormatVersion(repo.FormatVersion),
-			).WithPrivateKey(repo.PrivateKey).WithRetention(retentionRules(repo.Retention)),
+			).WithPrivateKey(repo.PrivateKey).
+				WithRetention(retentionRules(repo.Retention)).
+				WithExclusions(snapshot.NewExclusions(repo.Exclude, repo.SkipIgnoreFiles)),
 			Environment: repo.Env,
 		}
 	}

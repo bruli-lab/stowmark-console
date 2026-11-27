@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
+	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
 
 const localKind = "local"
@@ -14,7 +15,23 @@ type Profile struct {
 	init        *InitOptions
 	privateKey  *string
 	fingerprint string
-	retention   *retention.Rules
+	defaults    *defaults
+}
+
+type defaults struct {
+	retention  *retention.Rules
+	exclusions snapshot.Exclusions
+}
+
+func (p Profile) withDefaults(change func(*defaults)) Profile {
+	updated := defaults{}
+	if p.defaults != nil {
+		updated = *p.defaults
+	}
+	change(&updated)
+	p.defaults = &updated
+
+	return p
 }
 
 func NewProfile(name, location string, init InitOptions) Profile {
@@ -32,16 +49,27 @@ func (p Profile) WithFingerprint(fingerprint string) Profile {
 }
 
 func (p Profile) WithRetention(rules *retention.Rules) Profile {
-	p.retention = rules
-	return p
+	return p.withDefaults(func(d *defaults) { d.retention = rules })
 }
 
 func (p Profile) Retention() (retention.Rules, bool) {
-	if p.retention == nil {
+	if p.defaults == nil || p.defaults.retention == nil {
 		return retention.Rules{}, false
 	}
 
-	return *p.retention, true
+	return *p.defaults.retention, true
+}
+
+func (p Profile) WithExclusions(exclusions snapshot.Exclusions) Profile {
+	return p.withDefaults(func(d *defaults) { d.exclusions = exclusions })
+}
+
+func (p Profile) Exclusions() snapshot.Exclusions {
+	if p.defaults == nil {
+		return snapshot.Exclusions{}
+	}
+
+	return p.defaults.exclusions
 }
 
 func (p Profile) Name() string {

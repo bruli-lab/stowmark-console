@@ -39,15 +39,21 @@ func TestCreateSnapshot(t *testing.T) {
 	Then a created event with the new snapshot is returned`, func(t *testing.T) {
 		t.Parallel()
 		created := fixtures.Snapshot().WithSource("/data").Build()
+		skipped := []snapshot.SkippedFile{{Path: "app.sock", Kind: "socket"}}
+		exclusions := snapshot.NewExclusions([]string{"*.tmp"}, true)
 		repo := &mocks.SnapshotRepositoryMock{
-			CreateFunc: func(context.Context, *snapshot.Creation) (snapshot.Snapshot, error) { return created, nil },
+			CreateFunc: func(context.Context, *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error) {
+				return created, skipped, nil
+			},
 		}
 
-		events, err := app.NewCreateSnapshot(repo).Handle(t.Context(), app.CreateSnapshotCommand{Source: "/data"})
+		events, err := app.NewCreateSnapshot(repo).Handle(t.Context(), app.CreateSnapshotCommand{Source: "/data", Exclusions: exclusions})
 
 		require.NoError(t, err)
 		event := singleEvent[snapshot.Created](t, events, snapshot.CreatedEventName)
 		require.Equal(t, created, event.Snapshot)
+		require.Equal(t, skipped, event.Skipped)
+		require.Equal(t, exclusions, repo.CreateCalls()[0].Creation.Exclusions())
 		require.Equal(t, created.ID(), event.AggregateRootID())
 		require.Equal(t, "/data", repo.CreateCalls()[0].Creation.Source())
 	})
@@ -57,8 +63,8 @@ func TestCreateSnapshot(t *testing.T) {
 	Then the error is returned`, func(t *testing.T) {
 		t.Parallel()
 		repo := &mocks.SnapshotRepositoryMock{
-			CreateFunc: func(context.Context, *snapshot.Creation) (snapshot.Snapshot, error) {
-				return snapshot.Snapshot{}, errBackend
+			CreateFunc: func(context.Context, *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error) {
+				return snapshot.Snapshot{}, nil, errBackend
 			},
 		}
 

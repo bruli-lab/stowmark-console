@@ -7,10 +7,14 @@ import (
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark/pkg/stowmark"
 )
 
-const lockedMessage = "repository is locked"
+const (
+	lockedMessage         = "repository is locked"
+	excludePatternMessage = "invalid exclude pattern"
+)
 
 type domainError struct {
 	domain error
@@ -48,6 +52,10 @@ func translate(err error) error {
 
 	if errors.Is(err, stowmark.ErrPrivateKeyRequired) {
 		return fmt.Errorf("%w: %w", encryption.ErrPrivateKeyRequired, err)
+	}
+
+	if strings.Contains(err.Error(), excludePatternMessage) {
+		return domainError{domain: snapshot.ErrInvalidExcludePattern, cause: err}
 	}
 
 	if strings.Contains(err.Error(), lockedMessage) {

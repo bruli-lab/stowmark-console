@@ -110,6 +110,9 @@ repositories:
       keep_last: 7
       keep_daily: 14
       keep_monthly: 12
+    exclude:
+      - "*.tmp"
+      - node_modules/
   - name: nas
     url: smb://pablo@nas:445/backups/stowmark
     env:
@@ -132,6 +135,8 @@ repositories:
 | `private_key`, `public_key` | no | Same as `STOWMARK_PRIVATE_KEY` and `STOWMARK_PUBLIC_KEY` |
 | `compression`, `compression_level` | no | Same as `STOWMARK_COMPRESSION` and `STOWMARK_COMPRESSION_LEVEL` |
 | `format_version` | no | Same as `STOWMARK_FORMAT_VERSION` |
+| `exclude` | no | Exclude patterns that prefill the create form (same syntax as `.gitignore`) |
+| `skip_ignore_files` | no | `true` to ignore the `.stowmarkignore` files of the origin by default |
 | `retention` | no | Keep rules that prefill `:forget`: `keep_last`, `keep_daily`, `keep_weekly`, `keep_monthly`, `keep_yearly` and `keep_within` (`30d`, `2w`, `36h`) |
 | `env` | no | Environment variables set while the repository is open, such as the credentials of a remote backend |
 
@@ -234,6 +239,13 @@ Press `:` in any view, type a command and press `Enter`. While you type, the foo
 ### Creating and restoring
 
 Creating a snapshot opens a form for the origin directory, prefilled with the source of the selected snapshot. While you type, it suggests the subdirectories of the path and the origins of earlier snapshots: `Tab` accepts the highlighted suggestion and `↑`/`↓` move between them. The form tells you whether the path is an existing directory and only accepts directories.
+
+`Enter` then shows the snapshot options, prefilled with the `exclude` and `skip_ignore_files` of the repository:
+
+- **Exclude**: patterns separated by commas, with the syntax of `.gitignore` (`*.tmp`, `cache/`, `/build`, `!keep.log`). They are added to the `.stowmarkignore` files of the origin.
+- **Read .stowmarkignore files**: toggle it with `Space` to ignore those files for this snapshot. The form says whether the origin has one.
+
+Stowmark stores regular files only (and, from format version 3, directories and symbolic links). When the origin has entries it cannot store, such as sockets, named pipes or devices, the message counts them and a dialog lists them.
 
 Restoring asks for a destination directory first. It defaults to `~/stowmark-restore/<snapshot-id>`, never to the original source. The confirmation shows the destination and warns when it already contains files, which would be overwritten. Only `y` confirms the restore.
 

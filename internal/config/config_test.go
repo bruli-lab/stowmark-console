@@ -158,6 +158,10 @@ repositories:
       keep_last: 7
       keep_daily: 14
       keep_within: 2w
+    exclude:
+      - "*.tmp"
+      - node_modules/
+    skip_ignore_files: true
 `)
 
 		conf, err := config.FromEnvironment(map[string]string{
@@ -184,6 +188,10 @@ repositories:
 		require.Equal(t, 7, laptop.Retention.KeepLast)
 		require.Equal(t, 14, laptop.Retention.KeepDaily)
 		require.Equal(t, 14*24*time.Hour, laptop.Retention.Within)
+		require.Equal(t, []string{"*.tmp", "node_modules/"}, laptop.Exclude)
+		require.True(t, laptop.SkipIgnoreFiles)
+		require.Empty(t, nas.Exclude)
+		require.False(t, nas.SkipIgnoreFiles)
 	})
 
 	t.Run(`Given only a repositories file

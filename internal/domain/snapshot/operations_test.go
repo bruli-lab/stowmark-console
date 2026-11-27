@@ -16,7 +16,7 @@ func TestCreation(t *testing.T) {
 	Then it is rejected`, func(t *testing.T) {
 		t.Parallel()
 
-		_, err := snapshot.NewCreation("")
+		_, err := snapshot.NewCreation("", snapshot.Exclusions{})
 
 		require.ErrorIs(t, err, snapshot.ErrSourceRequired)
 	})
@@ -25,13 +25,16 @@ func TestCreation(t *testing.T) {
 	When it is marked as created with a snapshot
 	Then a created event for that snapshot is recorded`, func(t *testing.T) {
 		t.Parallel()
-		creation, err := snapshot.NewCreation("/data")
+		exclusions := snapshot.NewExclusions([]string{"*.tmp"}, true)
+		creation, err := snapshot.NewCreation("/data", exclusions)
 		require.NoError(t, err)
 		require.Equal(t, "/data", creation.Source())
+		require.Equal(t, exclusions, creation.Exclusions())
 		require.Empty(t, creation.Events())
 		created := fixtures.Snapshot().WithID("snap").WithSource("/data").Build()
+		skipped := []snapshot.SkippedFile{{Path: "run/app.sock", Kind: "socket"}}
 
-		require.NoError(t, creation.Created(created))
+		require.NoError(t, creation.Created(created, skipped))
 
 		events := creation.Events()
 		require.Len(t, events, 1)
@@ -40,16 +43,17 @@ func TestCreation(t *testing.T) {
 		require.Equal(t, snapshot.CreatedEventName, event.EventName())
 		require.Equal(t, "snap", event.AggregateRootID())
 		require.Equal(t, created, event.Snapshot)
+		require.Equal(t, skipped, event.Skipped)
 	})
 
 	t.Run(`Given a creation
 	When it is marked as created with a snapshot without id
 	Then it is rejected and no event is recorded`, func(t *testing.T) {
 		t.Parallel()
-		creation, err := snapshot.NewCreation("/data")
+		creation, err := snapshot.NewCreation("/data", snapshot.Exclusions{})
 		require.NoError(t, err)
 
-		require.ErrorIs(t, creation.Created(snapshot.Snapshot{}), snapshot.ErrSnapshotIDRequired)
+		require.ErrorIs(t, creation.Created(snapshot.Snapshot{}, nil), snapshot.ErrSnapshotIDRequired)
 		require.Empty(t, creation.Events())
 	})
 }
