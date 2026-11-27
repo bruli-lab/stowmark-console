@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bruli-lab/stowmark-console/internal/config"
 	"github.com/stretchr/testify/require"
@@ -153,6 +154,10 @@ repositories:
     url: ~/backups
     private_key: ~/.config/stowmark/key
     format_version: 3
+    retention:
+      keep_last: 7
+      keep_daily: 14
+      keep_within: 2w
 `)
 
 		conf, err := config.FromEnvironment(map[string]string{
@@ -175,6 +180,10 @@ repositories:
 		require.Equal(t, "none", laptop.Compression)
 		require.Equal(t, 3, laptop.FormatVersion)
 		require.Equal(t, 2, nas.FormatVersion)
+		require.Nil(t, nas.Retention)
+		require.Equal(t, 7, laptop.Retention.KeepLast)
+		require.Equal(t, 14, laptop.Retention.KeepDaily)
+		require.Equal(t, 14*24*time.Hour, laptop.Retention.Within)
 	})
 
 	t.Run(`Given only a repositories file
@@ -215,6 +224,22 @@ repositories:
 			name:     "an unknown compression",
 			content:  "repositories:\n  - name: nas\n    url: /a\n    compression: rar\n",
 			expected: config.ErrInvalidCompression,
+		},
+		{
+			name:     "a negative retention rule",
+			content:  "repositories:\n  - name: nas\n    url: /a\n    retention:\n      keep_last: -1\n",
+			expected: config.ErrInvalidRetention,
+		},
+		{
+			name:     "an invalid keep within",
+			content:  "repositories:\n  - name: nas\n    url: /a\n    retention:\n      keep_within: 3y\n",
+			expected: config.ErrInvalidRetention,
+			message:  "3y",
+		},
+		{
+			name:    "an unknown retention rule",
+			content: "repositories:\n  - name: nas\n    url: /a\n    retention:\n      keep_hourly: 3\n",
+			message: "keep_hourly",
 		},
 		{
 			name:    "an unknown field",

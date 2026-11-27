@@ -19,6 +19,7 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/app"
 	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/fixtures"
 	"github.com/bruli-lab/stowmark-console/internal/mocks"
@@ -39,6 +40,7 @@ type harness struct {
 	snapshots     *mocks.SnapshotRepositoryMock
 	keys          *mocks.KeysMock
 	lockReport    repository.LockReport
+	retention     *mocks.RetentionRepositoryMock
 }
 
 var errUnreachable = errors.New("unreachable")
@@ -100,7 +102,23 @@ func newHarness(t *testing.T, initialized bool) *harness {
 		RewrapFunc: func(context.Context, *encryption.Rewrap) error { return nil },
 		RotateFunc: func(context.Context, *encryption.Rotation) error { return nil },
 	}
-	buses := app.NewBuses(app.Ports{Catalog: h.catalog, Repositories: repositories, Snapshots: snapshots, Keys: h.keys})
+	h.retention = &mocks.RetentionRepositoryMock{
+		PlanForgetFunc: func(context.Context, retention.Policy) (retention.Plan, error) { return nil, nil },
+		ForgetFunc: func(context.Context, *retention.Forgetting) (retention.ForgetResult, error) {
+			return retention.ForgetResult{}, nil
+		},
+		PlanPruneFunc: func(context.Context) (retention.PrunePlan, error) { return retention.PrunePlan{}, nil },
+		PruneFunc: func(context.Context, *retention.Pruning) (retention.PruneResult, error) {
+			return retention.PruneResult{}, nil
+		},
+	}
+	buses := app.NewBuses(&app.Ports{
+		Catalog:      h.catalog,
+		Repositories: repositories,
+		Snapshots:    snapshots,
+		Keys:         h.keys,
+		Retention:    h.retention,
+	})
 	h.openDirectory = t.TempDir()
 	model := New(t.Context(), buses, WithFileOpener(h.openDirectory, func(path string) error {
 		h.opened = append(h.opened, path)

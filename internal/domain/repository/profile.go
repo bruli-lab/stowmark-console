@@ -1,6 +1,10 @@
 package repository
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
+)
 
 const localKind = "local"
 
@@ -10,6 +14,7 @@ type Profile struct {
 	init        *InitOptions
 	privateKey  *string
 	fingerprint string
+	retention   *retention.Rules
 }
 
 func NewProfile(name, location string, init InitOptions) Profile {
@@ -24,6 +29,19 @@ func (p Profile) WithPrivateKey(path *string) Profile {
 func (p Profile) WithFingerprint(fingerprint string) Profile {
 	p.fingerprint = fingerprint
 	return p
+}
+
+func (p Profile) WithRetention(rules *retention.Rules) Profile {
+	p.retention = rules
+	return p
+}
+
+func (p Profile) Retention() (retention.Rules, bool) {
+	if p.retention == nil {
+		return retention.Rules{}, false
+	}
+
+	return *p.retention, true
 }
 
 func (p Profile) Name() string {

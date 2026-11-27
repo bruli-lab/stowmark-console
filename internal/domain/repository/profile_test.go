@@ -2,8 +2,10 @@ package repository_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
 	"github.com/stretchr/testify/require"
 )
 
@@ -100,5 +102,32 @@ func TestInitOptionsFormatVersion(t *testing.T) {
 		t.Parallel()
 
 		require.False(t, repository.NewInitOptions("", nil, nil).WithFormatVersion(3).EncryptsMetadata())
+	})
+}
+
+func TestProfileRetention(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given a profile with retention rules
+	When its retention is asked
+	Then it returns the rules`, func(t *testing.T) {
+		t.Parallel()
+		rules := retention.Rules{Last: 7, Within: time.Hour}
+
+		profile := repository.NewProfile("nas", "/backups", repository.NewInitOptions("", nil, nil)).WithRetention(&rules)
+
+		configured, ok := profile.Retention()
+		require.True(t, ok)
+		require.Equal(t, rules, configured)
+	})
+
+	t.Run(`Given a profile without retention rules
+	When its retention is asked
+	Then it reports that there are none`, func(t *testing.T) {
+		t.Parallel()
+
+		_, ok := repository.NewProfile("nas", "/backups", repository.NewInitOptions("", nil, nil)).Retention()
+
+		require.False(t, ok)
 	})
 }

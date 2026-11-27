@@ -107,6 +107,9 @@ func (m *Model) handleIntent(msg tea.Msg) (tea.Cmd, bool) {
 		if cmd, handled := m.handleLockIntent(msg); handled {
 			return cmd, true
 		}
+		if cmd, handled := m.handleRetentionIntent(msg); handled {
+			return cmd, true
+		}
 		return m.handleOperationIntent(msg)
 	}
 
@@ -143,6 +146,17 @@ func (m *Model) handleOperationIntent(msg tea.Msg) (tea.Cmd, bool) {
 		start = func() tea.Cmd { return m.rotateKey(msg.request) }
 	case unlockConfirmed:
 		start = func() tea.Cmd { return m.unlockRepository(msg.all) }
+	case forgetRulesChosen:
+		start = func() tea.Cmd { return m.planForget(msg.rules) }
+	case forgetConfirmed:
+		start = func() tea.Cmd { return m.forgetSnapshots(&msg.request) }
+	case pruneRequested:
+		if !m.requireRepository() {
+			return nil, true
+		}
+		start = m.planPrune
+	case pruneConfirmed:
+		start = m.pruneRepository
 	default:
 		return nil, false
 	}

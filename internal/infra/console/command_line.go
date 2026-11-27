@@ -55,6 +55,18 @@ var consoleCommands = []consoleCommand{
 		run:       func() tea.Cmd { return emit(rekeyRequested{}) },
 	},
 	{
+		names:   []string{"forget"},
+		listed:  true,
+		summary: "Apply a retention",
+		run:     func() tea.Cmd { return emit(forgetFormRequested{}) },
+	},
+	{
+		names:   []string{"prune"},
+		listed:  true,
+		summary: "Free unused space",
+		run:     func() tea.Cmd { return emit(pruneRequested{}) },
+	},
+	{
 		names:   []string{"unlock"},
 		listed:  true,
 		summary: "Remove stale locks",

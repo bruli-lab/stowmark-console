@@ -3,6 +3,7 @@ package console
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -198,7 +199,7 @@ func (m *Model) panelParts(width, height int) (parts []string, columns int) {
 
 func (m *Model) panelColumns() [][]string {
 	encrypted := m.connected() && m.current.Encrypted()
-	columns := [][]string{navigationColumn(m.top().name()), commandsColumn(encrypted)}
+	columns := append([][]string{navigationColumn(m.top().name())}, commandsColumns(encrypted)...)
 
 	if encrypted {
 		columns = append(columns, encryptionColumn(m.current))
@@ -227,13 +228,20 @@ func navigationColumn(current string) []string {
 	return lines
 }
 
-func commandsColumn(encrypted bool) []string {
-	lines := []string{headerStyle.Render("Commands"), ""}
-	for _, command := range listedCommands(encrypted) {
-		lines = append(lines, fmt.Sprintf(":%-7s ", command.name())+mutedStyle.Render(command.summary))
+func commandsColumns(encrypted bool) [][]string {
+	var columns [][]string
+	header := headerStyle.Render("Commands")
+
+	for chunk := range slices.Chunk(listedCommands(encrypted), panelLines-2) {
+		lines := []string{header, ""}
+		for _, command := range chunk {
+			lines = append(lines, fmt.Sprintf(":%-7s ", command.name())+mutedStyle.Render(command.summary))
+		}
+		columns = append(columns, lines)
+		header = ""
 	}
 
-	return lines
+	return columns
 }
 
 func encryptionColumn(profile repository.Profile) []string {

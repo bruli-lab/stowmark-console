@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
 	"github.com/caarlos0/env/v11"
 	"go.yaml.in/yaml/v3"
 )
@@ -22,6 +24,7 @@ var (
 	ErrNoRepositories     = errors.New("no repositories configured")
 	ErrInvalidRepository  = errors.New("invalid repository")
 	ErrInvalidFormat      = errors.New("invalid format version")
+	ErrInvalidRetention   = errors.New("invalid retention")
 )
 
 const (
@@ -45,7 +48,18 @@ type Repository struct {
 	Compression      string            `yaml:"compression"`
 	CompressionLevel *int              `yaml:"compression_level"`
 	FormatVersion    int               `yaml:"format_version"`
+	Retention        *Retention        `yaml:"retention"`
 	Env              map[string]string `yaml:"env"`
+}
+
+type Retention struct {
+	KeepLast    int           `yaml:"keep_last"`
+	KeepDaily   int           `yaml:"keep_daily"`
+	KeepWeekly  int           `yaml:"keep_weekly"`
+	KeepMonthly int           `yaml:"keep_monthly"`
+	KeepYearly  int           `yaml:"keep_yearly"`
+	KeepWithin  string        `yaml:"keep_within"`
+	Within      time.Duration `yaml:"-"`
 }
 
 type environmentConfig struct {
@@ -155,6 +169,9 @@ func normalize(repositories []Repository) error {
 		if err := validate(repo, names); err != nil {
 			return err
 		}
+		if err := normalizeRetention(repo); err != nil {
+			return err
+		}
 		names[repo.Name] = true
 
 		if repo.Compression == "" {
@@ -186,6 +203,26 @@ func validate(repo *Repository, names map[string]bool) error {
 	case repo.FormatVersion < 0 || repo.FormatVersion > latestFormatVersion:
 		return fmt.Errorf("%w %d in %q, expected 1, 2 or 3", ErrInvalidFormat, repo.FormatVersion, repo.Name)
 	}
+
+	return nil
+}
+
+func normalizeRetention(repo *Repository) error {
+	if repo.Retention == nil {
+		return nil
+	}
+
+	keep := repo.Retention
+	if slices.ContainsFunc([]int{keep.KeepLast, keep.KeepDaily, keep.KeepWeekly, keep.KeepMonthly, keep.KeepYearly},
+		func(count int) bool { return count < 0 }) {
+		return fmt.Errorf("%w in %q: keep rules must not be negative", ErrInvalidRetention, repo.Name)
+	}
+
+	within, err := retention.ParseWithin(keep.KeepWithin)
+	if err != nil {
+		return fmt.Errorf("%w in %q: %w", ErrInvalidRetention, repo.Name, err)
+	}
+	keep.Within = within
 
 	return nil
 }
