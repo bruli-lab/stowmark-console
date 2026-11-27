@@ -62,16 +62,19 @@ tasks:
       - |
         set -euo pipefail
         echo "🐳 Starting remote backends..."
-        docker compose -f {{.COMPOSE_FILE}} up -d --wait
+        docker compose -f {{.COMPOSE_FILE}} up -d --wait --wait-timeout 180
+        echo "🔑 Giving the repositories of SSH and SMB to $HOST_UID:$HOST_GID..."
         docker compose -f {{.COMPOSE_FILE}} exec -T ssh chown "$HOST_UID:$HOST_GID" /repositories
         docker compose -f {{.COMPOSE_FILE}} exec -T smb chown "$HOST_UID:$HOST_GID" /shares/stowmark
-        curl -fsS -X PUT http://localhost:15000/stowmark > /dev/null
+        echo "🪣 Creating the S3 and GCS buckets..."
+        curl -fsS --retry 10 --retry-connrefused --retry-delay 1 -X PUT http://localhost:15000/stowmark > /dev/null
         curl -fsS -X POST -H "Content-Type: application/json" -d '{"name":"stowmark"}' http://localhost:14443/storage/v1/b > /dev/null || true
-        for _ in $(seq 1 30); do
+        echo "🔐 Reading the SSH host keys..."
+        for _ in $(seq 1 60); do
           ssh-keyscan -p 12222 localhost > {{.LOCAL_ENV_DIR}}/ssh/known_hosts 2>/dev/null && test -s {{.LOCAL_ENV_DIR}}/ssh/known_hosts && break
           sleep 1
         done
-        test -s {{.LOCAL_ENV_DIR}}/ssh/known_hosts
+        test -s {{.LOCAL_ENV_DIR}}/ssh/known_hosts || { echo "❌ the SSH server did not answer ssh-keyscan" >&2; exit 1; }
         echo "✅ Remote backends are ready"
 
   env:down:

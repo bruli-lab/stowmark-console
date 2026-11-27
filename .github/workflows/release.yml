@@ -69,6 +69,37 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Go and Task
+        uses: ./.github/actions/setup-go-task
+
+      - name: Integration tests
+        run: task test:integration
+
+      - name: Upload integration coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: ./coverage-integration.out
+          flags: integration
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
+      - name: Backend logs
+        if: failure()
+        run: docker compose -f docker/compose.yaml logs --no-color
+
+      - name: Stop the backends
+        if: always()
+        run: task env:down
+
   trivy-filesystem:
     name: Scan source and dependencies
     runs-on: ubuntu-latest
@@ -141,6 +172,7 @@ jobs:
       - lint
       - security
       - test
+      - integration-tests
       - trivy-filesystem
 
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
