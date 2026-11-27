@@ -79,7 +79,8 @@ func runConsole(conf *config.Config) (err error) {
 
 	model := console.New(ctx, buses,
 		console.WithFileOpener(openDirectory, desktop.Open),
-		console.WithSplash(buildinfo.Version(version), splashDuration),
+		console.WithVersion(buildinfo.Version(version)),
+		console.WithSplash(splashDuration),
 		console.WithProgressFeed(feed),
 	)
 

@@ -12,13 +12,18 @@ import (
 type splashFinishedMsg struct{}
 
 type splash struct {
-	version  string
 	duration time.Duration
 }
 
-func WithSplash(version string, duration time.Duration) Option {
+func WithVersion(version string) Option {
 	return func(m *Model) {
-		m.splash = &splash{version: version, duration: duration}
+		m.version = version
+	}
+}
+
+func WithSplash(duration time.Duration) Option {
+	return func(m *Model) {
+		m.splash = &splash{duration: duration}
 	}
 }
 
@@ -36,8 +41,8 @@ func (m *Model) skipSplash(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-func (s *splash) view(width, height int) string {
-	lines := []string{splashVersionStyle.Render(s.version)}
+func (s *splash) view(version string, width, height int) string {
+	lines := []string{splashVersionStyle.Render(version)}
 
 	for _, logo := range []string{splashLogo(), stowmarkLogo()} {
 		if lipgloss.Height(logo)+2 <= height && lipgloss.Width(logo) <= width {

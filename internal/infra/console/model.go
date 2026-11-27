@@ -33,6 +33,7 @@ type Model struct {
 	openDirectory   string
 	opener          FileOpener
 	splash          *splash
+	version         string
 }
 
 type FileOpener func(path string) error
