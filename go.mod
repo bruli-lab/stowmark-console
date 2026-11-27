@@ -7,7 +7,7 @@ require (
 	charm.land/bubbletea/v2 v2.2.0
 	charm.land/lipgloss/v2 v2.1.1
 	github.com/bruli-lab/go-core v1.10.0
-	github.com/bruli-lab/stowmark v1.14.0
+	github.com/bruli-lab/stowmark v1.14.1
 	github.com/caarlos0/env/v11 v11.4.2
 	github.com/charmbracelet/x/ansi v0.12.0
 	github.com/google/uuid v1.6.0

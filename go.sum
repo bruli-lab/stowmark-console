@@ -84,8 +84,8 @@ github.com/aymanbagabas/go-udiff v0.4.1 h1:OEIrQ8maEeDBXQDoGCbbTTXYJMYRCRO1fnodZ
 github.com/aymanbagabas/go-udiff v0.4.1/go.mod h1:0L9PGwj20lrtmEMeyw4WKJ/TMyDtvAoK9bf2u/mNo3w=
 github.com/bruli-lab/go-core v1.10.0 h1:+u/ZiARSh/4MpaCrstP+gim0Are6ZhpaCtuCgbCj02I=
 github.com/bruli-lab/go-core v1.10.0/go.mod h1:u/yuL1ZxbAqn/nj81Fr/ThE3me7iNUXy7n0BmG1DThs=
-github.com/bruli-lab/stowmark v1.14.0 h1:et6jTJgL5X8RW8IbmHFhc73HyxkieuG7HDbMXmsxOqU=
-github.com/bruli-lab/stowmark v1.14.0/go.mod h1:zNzH1enn1i6hdtt7ZtDDmIV2ATDRSSTmJOMUJq+naDo=
+github.com/bruli-lab/stowmark v1.14.1 h1:BEjy9xQOyxKG4Ba3SMB4pS0vmoiSKVL1G26e59oZMgU=
+github.com/bruli-lab/stowmark v1.14.1/go.mod h1:qBtLuFlOO2+OfiaODvGVSfvlQMaxhs52AuiuMrBGGhM=
 github.com/caarlos0/env/v11 v11.4.2 h1:fosEVW/SjFBBzATf+buI6vsAfOzXxPrchST/RNzmBWQ=
 github.com/caarlos0/env/v11 v11.4.2/go.mod h1:sH0CUPGS25jkIKlk2q4qs0c+C7y++K7W3crU70JVB/k=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
