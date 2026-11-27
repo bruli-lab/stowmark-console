@@ -11,11 +11,15 @@ import (
 )
 
 const (
-	lockBadge         = "🔒"
-	minDialogWidth    = 76
-	sidebarTotalWidth = 28
-	minLogoHeight     = 32
-	maxErrorLines     = 3
+	lockBadge             = "🔒"
+	minDialogWidth        = 76
+	panelLines            = 6
+	panelColumnGap        = 4
+	minColumnWidth        = 16
+	maxColumnWidth        = 42
+	minLogoTerminalHeight = 45
+	detailLabelSize       = 13
+	maxErrorLines         = 3
 )
 
 var menuScreens = []string{"Repositories", "Snapshots", "Files", "Preview"}
@@ -42,7 +46,7 @@ func (m *Model) render() string {
 
 	m.resizeScreens()
 
-	sections := []string{m.renderHeader(), m.renderBody()}
+	sections := []string{m.renderHeader(), m.renderPanel(), m.renderBody()}
 	if m.err != nil {
 		sections = append(sections, m.renderError())
 	}
@@ -58,7 +62,7 @@ func renderDialog(content string, maxWidth int) string {
 }
 
 func (m *Model) contentSize() (width, height int) {
-	width = max(1, m.width-sidebarTotalWidth-contentStyle.GetHorizontalFrameSize())
+	width = max(1, m.width-contentStyle.GetHorizontalFrameSize())
 	height = max(1, m.bodyHeight()-contentStyle.GetVerticalFrameSize())
 
 	return width, height
@@ -70,26 +74,17 @@ func (m *Model) bodyHeight() int {
 		errorHeight = lipgloss.Height(m.renderError())
 	}
 
-	return max(1, m.height-2-errorHeight)
+	return max(1, m.height-2-m.panelHeight()-panelStyle.GetVerticalFrameSize()-errorHeight)
 }
 
 func (m *Model) renderBody() string {
 	height := m.bodyHeight()
-	sidebarWidth := sidebarTotalWidth - sidebarStyle.GetHorizontalFrameSize()
 
-	sidebar := sidebarStyle.
-		Width(sidebarTotalWidth).
-		Height(height).
-		MaxHeight(height).
-		Render(m.renderSidebar(height, sidebarWidth))
-
-	content := contentStyle.
-		Width(max(1, m.width-sidebarTotalWidth)).
+	return contentStyle.
+		Width(m.width).
 		Height(height).
 		MaxHeight(height).
 		Render(m.top().view())
-
-	return lipgloss.JoinHorizontal(lipgloss.Top, sidebar, content)
 }
 
 func (m *Model) renderHeader() string {
@@ -135,83 +130,144 @@ func (m *Model) renderFooter() string {
 	return footerStyle.Width(m.width).Render(truncate(help, max(1, m.width-footerStyle.GetHorizontalFrameSize())))
 }
 
-func (m *Model) renderSidebar(availableHeight, width int) string {
-	var builder strings.Builder
-
-	builder.WriteString(headerStyle.Render("Navigation"))
-	builder.WriteString("\n\n")
-
-	current := m.top().name()
-	for _, item := range menuScreens {
-		builder.WriteString(renderMenuItem(item, item == current))
+func (m *Model) renderPanel() string {
+	width := m.panelWidth()
+	if !m.showLogo() {
+		parts, _ := m.panelParts(width, panelLines)
+		return panelStyle.Width(m.width).Render(lipgloss.JoinHorizontal(lipgloss.Top, parts...))
 	}
 
-	writeCommands(&builder, m.connected() && m.current.Encrypted(), width)
+	logo := stowmarkLogo()
+	height := lipgloss.Height(logo)
+	parts, _ := m.panelParts(width-lipgloss.Width(logo)-panelColumnGap, height)
+	used := lipgloss.Width(lipgloss.JoinHorizontal(lipgloss.Top, parts...))
+	parts = append(parts, panelGap(width-used-lipgloss.Width(logo), height), logo)
 
-	if m.connected() && m.current.Encrypted() {
-		writeEncryption(&builder, m.current, width)
+	return panelStyle.Width(m.width).Render(lipgloss.JoinHorizontal(lipgloss.Top, parts...))
+}
+
+func (m *Model) panelWidth() int {
+	return m.width - panelStyle.GetHorizontalFrameSize()
+}
+
+func (m *Model) panelHeight() int {
+	if m.showLogo() {
+		return max(panelLines, lipgloss.Height(stowmarkLogo()))
+	}
+
+	return panelLines
+}
+
+func (m *Model) showLogo() bool {
+	if m.height < minLogoTerminalHeight {
+		return false
+	}
+
+	width := m.panelWidth()
+	_, all := m.panelParts(width, panelLines)
+	_, withLogo := m.panelParts(width-lipgloss.Width(stowmarkLogo())-panelColumnGap, panelLines)
+
+	return withLogo > 0 && withLogo == all
+}
+
+func (m *Model) panelParts(width, height int) (parts []string, columns int) {
+	used := 0
+
+	for _, column := range m.panelColumns() {
+		gap := 0
+		if columns > 0 {
+			gap = panelColumnGap
+		}
+		remaining := width - used - gap
+		if remaining < minColumnWidth {
+			break
+		}
+		if gap > 0 {
+			parts = append(parts, panelGap(gap, height))
+		}
+		rendered := renderPanelColumn(column, min(remaining, maxColumnWidth), height)
+		parts = append(parts, rendered)
+		used += gap + lipgloss.Width(rendered)
+		columns++
+	}
+
+	return parts, columns
+}
+
+func (m *Model) panelColumns() [][]string {
+	encrypted := m.connected() && m.current.Encrypted()
+	columns := [][]string{navigationColumn(m.top().name()), commandsColumn(encrypted)}
+
+	if encrypted {
+		columns = append(columns, encryptionColumn(m.current))
 	}
 
 	if selected, ok := m.snapshots.selected(); ok {
-		builder.WriteString("\n")
-		builder.WriteString(headerStyle.Render("Snapshot"))
-		builder.WriteString("\n\n")
-		writeDetail(&builder, "ID", selected.ID(), width)
-		writeDetail(&builder, "Created", selected.CreatedAt().Local().Format(dateTimeFormat), width)
-		writeDetail(&builder, "Files", fmt.Sprintf("%d (%s)", selected.FileCount(), formatSize(selected.TotalSize())), width)
-		writeDetail(&builder, "Source", selected.Source(), width)
+		columns = append(columns, []string{
+			headerStyle.Render("Snapshot"),
+			"",
+			detailLine("ID", selected.ID()),
+			detailLine("Created", selected.CreatedAt().Local().Format(dateTimeFormat)),
+			detailLine("Files", fmt.Sprintf("%d (%s)", selected.FileCount(), formatSize(selected.TotalSize()))),
+			detailLine("Source", selected.Source()),
+		})
 	}
 
-	return withLogo(builder.String(), availableHeight-sidebarStyle.GetVerticalFrameSize())
+	return columns
 }
 
-func withLogo(content string, height int) string {
-	logo := logoStyle.Render(stowmarkLogo())
-	if height < minLogoHeight || lipgloss.Height(logo)+1+lipgloss.Height(content) > height {
-		return content
+func navigationColumn(current string) []string {
+	lines := []string{headerStyle.Render("Navigation"), ""}
+	for _, item := range menuScreens {
+		lines = append(lines, renderMenuItem(item, item == current))
 	}
 
-	return logo + "\n\n" + content
+	return lines
 }
 
-func writeEncryption(builder *strings.Builder, profile repository.Profile, width int) {
-	builder.WriteString("\n")
-	builder.WriteString(headerStyle.Render(lockBadge + " Encrypted"))
-	builder.WriteString("\n\n")
+func commandsColumn(encrypted bool) []string {
+	lines := []string{headerStyle.Render("Commands"), ""}
+	for _, command := range listedCommands(encrypted) {
+		lines = append(lines, fmt.Sprintf(":%-7s ", command.name())+mutedStyle.Render(command.summary))
+	}
 
+	return lines
+}
+
+func encryptionColumn(profile repository.Profile) []string {
 	key := errorStyle.Render("not set")
 	if profile.PrivateKey() != nil {
-		key = truncateLeft(filepath.Base(*profile.PrivateKey()), width)
+		key = filepath.Base(*profile.PrivateKey())
 	}
-	builder.WriteString(mutedStyle.Render("Private key") + "\n" + key + "\n")
+	lines := []string{headerStyle.Render(lockBadge + " Encrypted"), "", detailLine("Private key", key)}
 
 	if fingerprint := profile.Fingerprint(); fingerprint != "" {
-		writeDetail(builder, "Fingerprint", fingerprint, width)
+		lines = append(lines, detailLine("Fingerprint", fingerprint))
 	}
+
+	return lines
 }
 
-func writeCommands(builder *strings.Builder, encrypted bool, width int) {
-	builder.WriteString("\n")
-	builder.WriteString(headerStyle.Render("Commands"))
-	builder.WriteString("\n\n")
-
-	for _, command := range listedCommands(encrypted) {
-		name := fmt.Sprintf("  :%-7s ", command.name())
-		builder.WriteString(name + mutedStyle.Render(truncate(command.summary, max(1, width-len(name)))) + "\n")
-	}
+func detailLine(label, value string) string {
+	return mutedStyle.Render(fmt.Sprintf("%-*s", detailLabelSize, label)) + value
 }
 
-func writeDetail(builder *strings.Builder, label, value string, width int) {
-	builder.WriteString(mutedStyle.Render(label))
-	builder.WriteString("\n")
-	builder.WriteString(truncate(value, width))
-	builder.WriteString("\n")
+func renderPanelColumn(lines []string, maxWidth, height int) string {
+	for i, line := range lines {
+		lines[i] = truncate(line, maxWidth)
+	}
+
+	return panelColumnStyle.Height(height).Render(strings.Join(lines, "\n"))
+}
+
+func panelGap(width, height int) string {
+	return panelColumnStyle.Width(max(0, width)).Height(height).Render("")
 }
 
 func renderMenuItem(label string, selected bool) string {
 	if selected {
-		return selectedMenuStyle.Render("› "+label) + "\n"
+		return selectedMenuStyle.Render("› " + label)
 	}
 
-	return menuStyle.Render("  "+label) + "\n"
+	return menuStyle.Render("  " + label)
 }
