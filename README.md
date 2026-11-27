@@ -18,6 +18,7 @@ Stowmark Console provides a compact, keyboard-driven interface for listing snaps
 - Create snapshots from a selected source directory
 - Verify the integrity of a snapshot
 - Restore a snapshot to a chosen destination after an explicit confirmation
+- Work with encrypted repositories, generate key pairs and rotate keys (`:keygen`, `:rewrap`, `:rekey`)
 - Cancel a running operation with `Esc`
 - Navigate using arrow keys or Vim-style key bindings
 
@@ -110,8 +111,9 @@ repositories:
       STOWMARK_SMB_PASSWORD: secret
   - name: cloud
     url: s3://my-bucket/stowmark
-    private_key: ~/.config/stowmark/private.key
-    public_key: ~/.config/stowmark/public.key
+    format_version: 3
+    private_key: ~/.config/stowmark/keys/1a2b3c4d-private.pem
+    public_key: ~/.config/stowmark/keys/1a2b3c4d-public.pem
     env:
       AWS_ACCESS_KEY_ID: AKIA...
       AWS_SECRET_ACCESS_KEY: ...
@@ -124,6 +126,7 @@ repositories:
 | `url` | yes | Path or URL of the repository (`~` is expanded for local paths) |
 | `private_key`, `public_key` | no | Same as `STOWMARK_PRIVATE_KEY` and `STOWMARK_PUBLIC_KEY` |
 | `compression`, `compression_level` | no | Same as `STOWMARK_COMPRESSION` and `STOWMARK_COMPRESSION_LEVEL` |
+| `format_version` | no | Same as `STOWMARK_FORMAT_VERSION` |
 | `env` | no | Environment variables set while the repository is open, such as the credentials of a remote backend |
 
 When `STOWMARK_REPOSITORY` is set, it is added first as the `default` repository with the options of the environment variables. With a single repository, the console opens it on start. With several, it starts on the repositories list so you can choose which one to open. `:repo` lists them all again, marks the current one and opens the selected one: its `env` variables replace those of the previous repository. Keep the file readable only by you (`chmod 600`) when it holds credentials.
@@ -139,10 +142,22 @@ The console is configured with environment variables. At least one repository mu
 | `STOWMARK_PUBLIC_KEY` | no | | Public key used to encrypt a repository when it is initialized |
 | `STOWMARK_COMPRESSION` | no | `none` | Compression of a new repository: `none`, `zstd`, `lz4`, `xz` or `gzip` |
 | `STOWMARK_COMPRESSION_LEVEL` | no | | Compression level of a new repository |
+| `STOWMARK_FORMAT_VERSION` | no | `2` | Format version of a new repository: `1`, `2` or `3` |
 | `STOWMARK_CONSOLE_LOG_FILE` | no | `~/.cache/stowmark-console/console.log` | File that receives Stowmark log output |
 | `STOWMARK_CONSOLE_CONFIG` | no | `~/.config/stowmark-console/repositories.yaml` | Repositories file |
 
 The initialization options only apply when the console creates a new repository, and they are shown in the confirmation dialog. Variables read by Stowmark itself, such as `STOWMARK_LOG_LEVEL`, are honored as well.
+
+### Encrypted repositories
+
+A repository is encrypted when it is initialized with a public key. Reading it, creating snapshots and restoring them need the matching private key, so set both keys for the repository. Format version 3 is recommended for encrypted repositories: it also encrypts the manifests.
+
+- The header and the repositories list show a 🔒 for repositories configured with a key, and the sidebar shows the private key and its fingerprint (the same `SHA256:` fingerprint Stowmark stores in the repository).
+- A format version 3 repository opened without its private key is reported as such, instead of offering to initialize it. A wrong or unreadable private key gives an error that names the repository and the setting to fix.
+- The console refuses to create snapshots in a repository configured with a public key but no private key: Stowmark would store the new files without encryption in a format version 2 repository.
+- `:keygen` generates a key pair in a folder and shows the `public_key` / `private_key` lines to add to the repositories file.
+- `:rewrap` wraps the repository key with a new public key (asymmetric rotation, fast). `:rekey` encrypts every object again with a new key generation (symmetric rotation, slow on big repositories; `Esc` cancels it and Stowmark discards the incomplete generation), and asks you to type the repository name to confirm. Both take an exclusive lock on the repository.
+- The console never writes the repositories file: after a key change it shows the lines to update. Restart the console once they are updated.
 
 ## Keyboard controls
 
@@ -201,6 +216,9 @@ Press `:` in any view, type a command and press `Enter`. `Esc` closes the comman
 | `:q`, `:quit` | Exit |
 | `:snap`, `:snapshots`, `:s` | Go back to the snapshots list |
 | `:repo`, `:repos`, `:repositories` | List the configured repositories and switch to another one |
+| `:keygen` | Generate a key pair for encrypted repositories |
+| `:rewrap` | Wrap the key of the open repository with a new public key |
+| `:rekey` | Encrypt every object of the open repository with a new key |
 
 ### Creating and restoring
 
@@ -214,7 +232,7 @@ While an operation is running, `Esc` cancels it.
 
 The project follows a hexagonal architecture:
 
-- `internal/domain`: entities, aggregates, value objects, events and ports (`repository`, `snapshot`). Events and aggregates are built on [go-core](https://github.com/bruli-lab/go-core) `event`.
+- `internal/domain`: entities, aggregates, value objects, events and ports (`repository`, `snapshot`, `encryption`). Events and aggregates are built on [go-core](https://github.com/bruli-lab/go-core) `event`.
 - `internal/app`: one query or command handler per use case on go-core `cqs`, subscribed to a command bus and a query bus (`app.NewBuses`). Commands return domain events.
 - `internal/infra/store`: adapter that implements the ports on top of the Stowmark library, with a single handler per session.
 - `internal/infra/console`: the terminal user interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) v2, which only talks to the application layer. A root model keeps a stack of screens (snapshots, files, preview) and the active dialog; screens emit intent messages and the root model runs the use cases.

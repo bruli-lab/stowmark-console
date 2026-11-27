@@ -22,12 +22,13 @@ func TestRepositoryStatus(t *testing.T) {
 	})
 
 	tests := []struct {
-		name        string
-		initialized bool
-		err         error
+		name   string
+		status repository.Status
+		err    error
 	}{
-		{name: "an initialized repository, then it reports it as initialized", initialized: true},
-		{name: "a repository not initialized yet, then it reports it as not initialized"},
+		{name: "an initialized repository, then it reports it as ready", status: repository.StatusReady},
+		{name: "a repository not initialized yet, then it reports it as not initialized", status: repository.StatusUninitialized},
+		{name: "an encrypted repository without its key, then it reports that the key is required", status: repository.StatusKeyRequired},
 		{name: "a repository that cannot be reached, then it returns the error", err: errBackend},
 	}
 
@@ -35,13 +36,13 @@ func TestRepositoryStatus(t *testing.T) {
 		t.Run(`Given `+tt.name, func(t *testing.T) {
 			t.Parallel()
 			repo := &mocks.RepositoryMock{
-				InitializedFunc: func(context.Context) (bool, error) { return tt.initialized, tt.err },
+				StatusFunc: func(context.Context) (repository.Status, error) { return tt.status, tt.err },
 			}
 
-			initialized, err := app.NewRepositoryStatus(repo).Handle(t.Context(), app.RepositoryStatusQuery{})
+			status, err := app.NewRepositoryStatus(repo).Handle(t.Context(), app.RepositoryStatusQuery{})
 
 			require.ErrorIs(t, err, tt.err)
-			require.Equal(t, tt.initialized, initialized)
+			require.Equal(t, tt.status, status)
 		})
 	}
 }

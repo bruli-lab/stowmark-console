@@ -243,6 +243,10 @@ func (m *Model) openInitConfirmation() {
 	body.WriteString("\n\nA new repository will be created with:")
 	body.WriteString("\n  Encryption:  " + encryptionSummary(m.current.Init()))
 	body.WriteString("\n  Compression: " + compressionSummary(m.current.Init()))
+	body.WriteString("\n  Format:      " + formatSummary(m.current.Init()))
+	if note := formatRecommendation(m.current.Init()); note != "" {
+		body.WriteString("\n\n" + mutedStyle.Render(note))
+	}
 
 	m.dialog = &confirmDialog{
 		title:     "Initialize repository " + m.current.Name(),
@@ -314,4 +318,27 @@ func (m *Model) openRestoreConfirmation(request restoreRequest) {
 		onConfirm: emit(restoreConfirmed{request: request}),
 		onCancel:  emit(statusMessage{text: "Restore cancelled"}),
 	}
+}
+
+type infoDialog struct {
+	title string
+	body  string
+}
+
+func (d *infoDialog) update(msg tea.Msg) (bool, tea.Cmd) {
+	key, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return false, nil
+	}
+
+	switch key.String() {
+	case "enter", "esc", "q", "ctrl+c":
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (d *infoDialog) view() string {
+	return headerStyle.Render(d.title) + "\n\n" + d.body + "\n\n[Enter/Esc] Close"
 }

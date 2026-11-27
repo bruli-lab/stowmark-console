@@ -1,11 +1,16 @@
 package repository
 
-const NoCompression = "none"
+const (
+	NoCompression        = "none"
+	DefaultFormatVersion = 2
+	LatestFormatVersion  = 3
+)
 
 type InitOptions struct {
 	compression      string
 	compressionLevel *int
 	publicKey        *string
+	formatVersion    int
 }
 
 func NewInitOptions(compression string, compressionLevel *int, publicKey *string) InitOptions {
@@ -18,6 +23,11 @@ func NewInitOptions(compression string, compressionLevel *int, publicKey *string
 		compressionLevel: compressionLevel,
 		publicKey:        publicKey,
 	}
+}
+
+func (o InitOptions) WithFormatVersion(version int) InitOptions {
+	o.formatVersion = version
+	return o
 }
 
 func (o InitOptions) Compression() string {
@@ -38,4 +48,16 @@ func (o InitOptions) PublicKey() *string {
 
 func (o InitOptions) Encrypted() bool {
 	return o.publicKey != nil
+}
+
+func (o InitOptions) FormatVersion() int {
+	if o.formatVersion == 0 {
+		return DefaultFormatVersion
+	}
+
+	return o.formatVersion
+}
+
+func (o InitOptions) EncryptsMetadata() bool {
+	return o.Encrypted() && o.FormatVersion() >= LatestFormatVersion
 }

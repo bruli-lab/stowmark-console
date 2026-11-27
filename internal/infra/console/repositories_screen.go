@@ -13,6 +13,7 @@ const currentMarker = "● "
 var repositoryColumns = []columnSpec{
 	{title: "NAME", width: 22},
 	{title: "TYPE", width: 8},
+	{title: "KEY", width: 3},
 	{title: "LOCATION"},
 }
 
@@ -34,7 +35,7 @@ func newRepositoriesScreen(profiles []repository.Profile, current string) *repos
 			marker = currentMarker
 			cursor = i
 		}
-		rows[i] = tableRow(repositoryColumns, marker+profile.Name(), profile.Kind(), profile.Location())
+		rows[i] = tableRow(repositoryColumns, marker+profile.Name(), profile.Kind(), encryptionMark(profile), profile.Location())
 	}
 
 	selectRow(&screen.table, rows, cursor)
@@ -108,4 +109,12 @@ func (s *repositoriesScreen) view() string {
 	}
 
 	return title + "\n\n" + s.table.View()
+}
+
+func encryptionMark(profile repository.Profile) string {
+	if profile.Encrypted() {
+		return lockBadge
+	}
+
+	return ""
 }
