@@ -55,6 +55,17 @@ var consoleCommands = []consoleCommand{
 		run:       func() tea.Cmd { return emit(rekeyRequested{}) },
 	},
 	{
+		names:   []string{"unlock"},
+		listed:  true,
+		summary: "Remove stale locks",
+		run:     func() tea.Cmd { return emit(unlockRequested{}) },
+	},
+	{
+		names:   []string{"unlock!"},
+		summary: "Remove every lock",
+		run:     func() tea.Cmd { return emit(unlockRequested{all: true}) },
+	},
+	{
 		names:   []string{"q", "q!", "quit"},
 		summary: "Exit",
 		run:     func() tea.Cmd { return tea.Quit },

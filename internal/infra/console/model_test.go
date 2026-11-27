@@ -38,6 +38,7 @@ type harness struct {
 	repositories  *mocks.RepositoryMock
 	snapshots     *mocks.SnapshotRepositoryMock
 	keys          *mocks.KeysMock
+	lockReport    repository.LockReport
 }
 
 var errUnreachable = errors.New("unreachable")
@@ -53,6 +54,8 @@ func newHarness(t *testing.T, initialized bool) *harness {
 		},
 		InitializeFunc: func(context.Context, repository.InitOptions) error { return nil },
 	}
+	h := &harness{}
+	repositories.UnlockFunc = func(context.Context, bool) (repository.LockReport, error) { return h.lockReport, nil }
 	snapshots := &mocks.SnapshotRepositoryMock{
 		ListFunc: func(context.Context) ([]snapshot.Snapshot, error) {
 			return []snapshot.Snapshot{fixtures.Snapshot().WithID(snapshotID).Build()}, nil
@@ -71,13 +74,11 @@ func newHarness(t *testing.T, initialized bool) *harness {
 			return filepath.Join(extraction.Directory(), filepath.Base(extraction.Path())), nil
 		},
 	}
-	h := &harness{
-		profiles: []repository.Profile{
-			repository.NewProfile("default", filepath.Join(t.TempDir(), "repository"), repository.NewInitOptions("zstd", nil, nil)),
-		},
-		repositories: repositories,
-		snapshots:    snapshots,
+	h.profiles = []repository.Profile{
+		repository.NewProfile("default", filepath.Join(t.TempDir(), "repository"), repository.NewInitOptions("zstd", nil, nil)),
 	}
+	h.repositories = repositories
+	h.snapshots = snapshots
 	h.catalog = &mocks.CatalogMock{
 		ProfilesFunc: func() []repository.Profile { return h.profiles },
 		OpenFunc: func(_ context.Context, name string) (repository.Profile, error) {

@@ -25,6 +25,9 @@ var _ repository.Repository = &RepositoryMock{}
 //			StatusFunc: func(ctx context.Context) (repository.Status, error) {
 //				panic("mock out the Status method")
 //			},
+//			UnlockFunc: func(ctx context.Context, all bool) (repository.LockReport, error) {
+//				panic("mock out the Unlock method")
+//			},
 //		}
 //
 //		// use mockedRepository in code that requires repository.Repository
@@ -37,6 +40,9 @@ type RepositoryMock struct {
 
 	// StatusFunc mocks the Status method.
 	StatusFunc func(ctx context.Context) (repository.Status, error)
+
+	// UnlockFunc mocks the Unlock method.
+	UnlockFunc func(ctx context.Context, all bool) (repository.LockReport, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -52,9 +58,17 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
+		// Unlock holds details about calls to the Unlock method.
+		Unlock []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// All is the all argument value.
+			All bool
+		}
 	}
 	lockInitialize sync.RWMutex
 	lockStatus     sync.RWMutex
+	lockUnlock     sync.RWMutex
 }
 
 // Initialize calls InitializeFunc.
@@ -122,5 +136,41 @@ func (mock *RepositoryMock) StatusCalls() []struct {
 	mock.lockStatus.RLock()
 	calls = mock.calls.Status
 	mock.lockStatus.RUnlock()
+	return calls
+}
+
+// Unlock calls UnlockFunc.
+func (mock *RepositoryMock) Unlock(ctx context.Context, all bool) (repository.LockReport, error) {
+	if mock.UnlockFunc == nil {
+		panic("RepositoryMock.UnlockFunc: method is nil but Repository.Unlock was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		All bool
+	}{
+		Ctx: ctx,
+		All: all,
+	}
+	mock.lockUnlock.Lock()
+	mock.calls.Unlock = append(mock.calls.Unlock, callInfo)
+	mock.lockUnlock.Unlock()
+	return mock.UnlockFunc(ctx, all)
+}
+
+// UnlockCalls gets all the calls that were made to Unlock.
+// Check the length with:
+//
+//	len(mockedRepository.UnlockCalls())
+func (mock *RepositoryMock) UnlockCalls() []struct {
+	Ctx context.Context
+	All bool
+} {
+	var calls []struct {
+		Ctx context.Context
+		All bool
+	}
+	mock.lockUnlock.RLock()
+	calls = mock.calls.Unlock
+	mock.lockUnlock.RUnlock()
 	return calls
 }

@@ -21,6 +21,7 @@ func failingBuses() app.Buses {
 	repositories := &mocks.RepositoryMock{
 		StatusFunc:     func(context.Context) (repository.Status, error) { return repository.StatusUninitialized, errBackend },
 		InitializeFunc: func(context.Context, repository.InitOptions) error { return errBackend },
+		UnlockFunc:     func(context.Context, bool) (repository.LockReport, error) { return repository.LockReport{}, errBackend },
 	}
 	snapshots := &mocks.SnapshotRepositoryMock{
 		ListFunc:     func(context.Context) ([]snapshot.Snapshot, error) { return nil, errBackend },
@@ -57,6 +58,7 @@ func TestNewBuses(t *testing.T) {
 	commands := []cqs.Command{
 		app.OpenRepositoryCommand{RepositoryName: "nas"},
 		app.InitRepositoryCommand{},
+		app.UnlockRepositoryCommand{All: true},
 		app.CreateSnapshotCommand{Source: "/data"},
 		app.VerifySnapshotCommand{SnapshotID: "snap"},
 		app.RestoreSnapshotCommand{SnapshotID: "snap", Destination: "/restore"},

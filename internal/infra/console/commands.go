@@ -17,7 +17,9 @@ func (m *Model) startOperation(message string, run func(ctx context.Context) tea
 	m.cancelOperation = cancel
 	m.loading = true
 	m.err = nil
-	m.progress = message
+	m.activity = message
+	m.cancelling = false
+	m.transfer = nil
 
 	return func() tea.Msg {
 		defer cancel()
@@ -27,7 +29,9 @@ func (m *Model) startOperation(message string, run func(ctx context.Context) tea
 
 func (m *Model) finishOperation() {
 	m.loading = false
-	m.progress = ""
+	m.activity = ""
+	m.cancelling = false
+	m.transfer = nil
 	if m.cancelOperation != nil {
 		m.cancelOperation()
 		m.cancelOperation = nil

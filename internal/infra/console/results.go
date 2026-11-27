@@ -99,6 +99,9 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 		}
 		m.message = fmt.Sprintf("Snapshot %s verified successfully", msg.snapshotID)
 
+	case repositoryUnlockedMsg:
+		m.handleUnlocked(&msg)
+
 	case keysGeneratedMsg, keyRewrappedMsg, keyRotatedMsg:
 		return m.handleKeyResult(msg)
 
@@ -156,7 +159,8 @@ func (m *Model) failWithKey(action string, err error, privateKey *string) bool {
 		return true
 	}
 
-	m.err = fmt.Errorf("failed to %s: %w", action, explainKeyError(m.current.WithPrivateKey(privateKey), err))
+	m.err = fmt.Errorf("failed to %s: %w", action,
+		explainLockError(explainKeyError(m.current.WithPrivateKey(privateKey), err)))
 	m.message = ""
 
 	return true

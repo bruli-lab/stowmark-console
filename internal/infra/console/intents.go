@@ -104,6 +104,9 @@ func (m *Model) handleIntent(msg tea.Msg) (tea.Cmd, bool) {
 		if cmd, handled := m.handleKeyIntent(msg); handled {
 			return cmd, true
 		}
+		if cmd, handled := m.handleLockIntent(msg); handled {
+			return cmd, true
+		}
 		return m.handleOperationIntent(msg)
 	}
 
@@ -138,6 +141,8 @@ func (m *Model) handleOperationIntent(msg tea.Msg) (tea.Cmd, bool) {
 		start = func() tea.Cmd { return m.rewrapKey(msg.request) }
 	case rotationConfirmed:
 		start = func() tea.Cmd { return m.rotateKey(msg.request) }
+	case unlockConfirmed:
+		start = func() tea.Cmd { return m.unlockRepository(msg.all) }
 	default:
 		return nil, false
 	}
