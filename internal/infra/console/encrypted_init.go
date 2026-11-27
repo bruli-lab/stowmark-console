@@ -2,7 +2,6 @@ package console
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -47,7 +46,7 @@ func (m *Model) handleEncryptedInitialized(msg *encryptedRepositoryInitializedMs
 	}
 
 	m.current = msg.profile
-	m.message = fmt.Sprintf("Repository %s initialized encrypted (format version %d)", m.current.Name(), m.current.Init().FormatVersion())
+	m.message = "Repository " + m.current.Name() + " initialized encrypted"
 	m.dialog = &infoDialog{title: "Repository " + m.current.Name() + " encrypted", body: encryptedInitSummary(m.current.Name(), msg.keys)}
 
 	return m.loadSnapshots("")

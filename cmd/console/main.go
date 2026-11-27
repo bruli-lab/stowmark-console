@@ -101,8 +101,7 @@ func catalogEntries(repositories []config.Repository) []store.Entry {
 			Profile: repository.NewProfile(
 				repo.Name,
 				repo.URL,
-				repository.NewInitOptions(repo.Compression, repo.CompressionLevel, repo.PublicKey).
-					WithFormatVersion(repo.FormatVersion),
+				repository.NewInitOptions(repo.Compression, repo.CompressionLevel, repo.PublicKey),
 			).WithPrivateKey(repo.PrivateKey).
 				WithRetention(retentionRules(repo.Retention)).
 				WithExclusions(snapshot.NewExclusions(repo.Exclude, repo.SkipIgnoreFiles)),

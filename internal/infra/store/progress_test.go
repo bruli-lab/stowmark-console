@@ -43,6 +43,8 @@ func TestStoreProgress(t *testing.T) {
 	snapshots := store.NewSnapshots(session)
 
 	var snapshotID string
+	entries := len([]string{"README.txt", "notes", "notes/todo.md"})
+	files := len([]string{"README.txt", "notes/todo.md"})
 
 	t.Run(`Given a session with a progress listener
 	When a snapshot is created
@@ -51,7 +53,7 @@ func TestStoreProgress(t *testing.T) {
 		require.NoError(t, err)
 		snapshotID = created.ID()
 
-		requireStage(t, recorder.take(), progress.StageBackingUp, 2, created.TotalSize())
+		requireStage(t, recorder.take(), progress.StageBackingUp, entries, created.TotalSize())
 	})
 
 	t.Run(`Given a session with a progress listener
@@ -60,7 +62,7 @@ func TestStoreProgress(t *testing.T) {
 		_, err := snapshots.Verify(t.Context(), verification(t, snapshotID))
 		require.NoError(t, err)
 
-		requireStage(t, recorder.take(), progress.StageVerifying, 2, -1)
+		requireStage(t, recorder.take(), progress.StageVerifying, entries, -1)
 	})
 
 	t.Run(`Given a session with a progress listener
@@ -69,7 +71,7 @@ func TestStoreProgress(t *testing.T) {
 		_, err := snapshots.Restore(t.Context(), restoration(t, snapshotID, t.TempDir()))
 		require.NoError(t, err)
 
-		requireStage(t, recorder.take(), progress.StageRestoring, 2, -1)
+		requireStage(t, recorder.take(), progress.StageRestoring, files, -1)
 	})
 }
 

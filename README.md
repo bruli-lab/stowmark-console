@@ -14,7 +14,7 @@ Stowmark Console provides a compact, keyboard-driven interface for listing snaps
 
 - List the snapshots of a Stowmark repository, newest first
 - Browse the files of a snapshot by directory, straight from its manifest
-- Offer to initialize the repository when it does not exist, choosing compression, level, format version and encryption
+- Offer to initialize the repository when it does not exist, choosing compression, level and encryption; new repositories always use the latest Stowmark format version
 - Preview text files stored in a snapshot with line numbers and scrolling
 - Create snapshots from a selected source directory
 - Verify the integrity of a snapshot
@@ -77,7 +77,7 @@ STOWMARK_REPOSITORY="$HOME/backups/stowmark" stowmark_console
 
 To work with several repositories, list them in a repositories file (see [Several repositories](#several-repositories)) and switch between them with `:repo`.
 
-If the path does not contain a Stowmark repository yet, the console opens an init form, prefilled with the repository configuration: compression (`none`, `zstd`, `lz4`, `gzip`, `xz`), its level when the algorithm has levels (empty uses Stowmark's default), format version (1–3) and encryption. `Tab`/`↑↓` move between fields, `←→` change the selected value and `Enter` initializes the repository. Compression and format cannot change once the repository exists. `Esc` quits without touching the disk, or goes back to the repositories list when several are configured.
+If the path does not contain a Stowmark repository yet, the console opens an init form, prefilled with the repository configuration: compression (`none`, `zstd`, `lz4`, `gzip`, `xz`), its level when the algorithm has levels (empty uses Stowmark's default) and encryption. The repository is created with the latest format version. `Tab`/`↑↓` move between fields, `←→` change the selected value and `Enter` initializes the repository. The compression cannot change once the repository exists. `Esc` quits without touching the disk, or goes back to the repositories list when several are configured.
 
 On start, the console shows the Stowmark logo and its version for a moment while the repositories load; press any key to skip it.
 
@@ -120,7 +120,6 @@ repositories:
       STOWMARK_SMB_PASSWORD: secret
   - name: cloud
     url: s3://my-bucket/stowmark
-    format_version: 3
     private_key: ~/.config/stowmark/keys/1a2b3c4d-private.pem
     public_key: ~/.config/stowmark/keys/1a2b3c4d-public.pem
     env:
@@ -135,7 +134,6 @@ repositories:
 | `url` | yes | Path or URL of the repository (`~` is expanded for local paths) |
 | `private_key`, `public_key` | no | Same as `STOWMARK_PRIVATE_KEY` and `STOWMARK_PUBLIC_KEY` |
 | `compression`, `compression_level` | no | Same as `STOWMARK_COMPRESSION` and `STOWMARK_COMPRESSION_LEVEL` |
-| `format_version` | no | Same as `STOWMARK_FORMAT_VERSION` |
 | `exclude` | no | Exclude patterns that prefill the create form (same syntax as `.gitignore`) |
 | `skip_ignore_files` | no | `true` to ignore the `.stowmarkignore` files of the origin by default |
 | `retention` | no | Keep rules that prefill `:forget`: `keep_last`, `keep_daily`, `keep_weekly`, `keep_monthly`, `keep_yearly` and `keep_within` (`30d`, `2w`, `36h`) |
@@ -154,20 +152,19 @@ The console is configured with environment variables. At least one repository mu
 | `STOWMARK_PUBLIC_KEY` | no | | Public key used to encrypt a repository when it is initialized |
 | `STOWMARK_COMPRESSION` | no | `none` | Compression of a new repository: `none`, `zstd`, `lz4`, `xz` or `gzip` |
 | `STOWMARK_COMPRESSION_LEVEL` | no | | Compression level of a new repository |
-| `STOWMARK_FORMAT_VERSION` | no | `2` | Format version of a new repository: `1`, `2` or `3` |
 | `STOWMARK_CONSOLE_LOG_FILE` | no | `~/.cache/stowmark-console/console.log` | File that receives Stowmark log output |
 | `STOWMARK_CONSOLE_CONFIG` | no | `~/.config/stowmark-console/repositories.yaml` | Repositories file |
 
-The initialization options only apply when the console creates a new repository, and they prefill the init form. Variables read by Stowmark itself, such as `STOWMARK_LOG_LEVEL`, are honored as well.
+The initialization options only apply when the console creates a new repository, and they prefill the init form. New repositories always use the latest Stowmark format version (3), so they get every current feature; an existing repository keeps its version, and moving to a newer one means creating a new repository. `format_version` and `STOWMARK_FORMAT_VERSION` from older versions of the console are ignored. Variables read by Stowmark itself, such as `STOWMARK_LOG_LEVEL`, are honored as well.
 
 ### Encrypted repositories
 
-A repository is encrypted when it is initialized with a public key. Reading it, creating snapshots and restoring them need the matching private key, so set both keys for the repository. Format version 3 is recommended for encrypted repositories: it also encrypts the manifests.
+A repository is encrypted when it is initialized with a public key. Reading it, creating snapshots and restoring them need the matching private key, so set both keys for the repository.
 
 - The header and the repositories list show a 🔒 for repositories configured with a key, and the panel at the top shows the private key and its fingerprint (the same `SHA256:` fingerprint Stowmark stores in the repository).
-- A format version 3 repository opened without its private key is reported as such, instead of offering to initialize it, and the console asks for the private key file (prefilled with the console's keys folder, or with its only private key). The session opens the repository with it and shows the `STOWMARK_PRIVATE_KEY` variable or the `private_key` line to set so the next session does not ask again. A key that does not open the repository is reported and asked again; `Esc` keeps the explanation. A wrong or unreadable private key gives an error that names the repository and the setting to fix.
+- An encrypted repository (format version 3) opened without its private key is reported as such, instead of offering to initialize it, and the console asks for the private key file (prefilled with the console's keys folder, or with its only private key). The session opens the repository with it and shows the `STOWMARK_PRIVATE_KEY` variable or the `private_key` line to set so the next session does not ask again. A key that does not open the repository is reported and asked again; `Esc` keeps the explanation. A wrong or unreadable private key gives an error that names the repository and the setting to fix.
 - The console refuses to create snapshots in a repository configured with a public key but no private key: Stowmark would store the new files without encryption in a format version 2 repository.
-- When the repository to initialize has no public key configured, the init form offers the encryption `new key pair`: it generates a new key pair in a folder (by default the console's keys folder), initializes the repository with the chosen options (format version 3 by default) and that public key, and opens it with the private key right away. It then shows the lines to add to the repositories file (or the `STOWMARK_*` variables for the `default` repository) so the next session can open it.
+- When the repository to initialize has no public key configured, the init form offers the encryption `new key pair`: it generates a new key pair in a folder (by default the console's keys folder), initializes the repository with the chosen options and that public key, and opens it with the private key right away. It then shows the lines to add to the repositories file (or the `STOWMARK_*` variables for the `default` repository) so the next session can open it.
 - `:keygen` generates a key pair in a folder and shows the `public_key` / `private_key` lines to add to the repositories file.
 - `:rewrap` wraps the repository key with a new public key (asymmetric rotation, fast). `:rekey` encrypts every object again with a new key generation (symmetric rotation, slow on big repositories; `Esc` cancels it and Stowmark discards the incomplete generation), and asks you to type the repository name to confirm. Both take an exclusive lock on the repository.
 - The console never writes the repositories file: after a key change it shows the lines to update. Restart the console once they are updated.

@@ -77,13 +77,13 @@ func TestInitOptionsFormatVersion(t *testing.T) {
 
 	t.Run(`Given init options without a format version
 	When the format version is asked
-	Then it is the Stowmark default`, func(t *testing.T) {
+	Then it is the latest one, so new repositories get every current feature`, func(t *testing.T) {
 		t.Parallel()
 
 		options := repository.NewInitOptions("", nil, &publicKey)
 
-		require.Equal(t, repository.DefaultFormatVersion, options.FormatVersion())
-		require.False(t, options.EncryptsMetadata())
+		require.Equal(t, repository.LatestFormatVersion, options.FormatVersion())
+		require.True(t, options.EncryptsMetadata())
 	})
 
 	t.Run(`Given encrypted init options with format version 3
