@@ -17,6 +17,7 @@ Stowmark Console provides a compact, keyboard-driven interface for listing snaps
 - Preview text files stored in a snapshot with line numbers and scrolling
 - Create snapshots from a selected source directory
 - Verify the integrity of a snapshot
+- Check the integrity of the whole repository (`:check`): structure only, all the data or a part of it
 - Restore a snapshot to a chosen destination after an explicit confirmation
 - Work with encrypted repositories, generate key pairs and rotate keys (`:keygen`, `:rewrap`, `:rekey`)
 - Cancel a running operation with `Esc`
@@ -224,6 +225,7 @@ Press `:` in any view, type a command and press `Enter`. While you type, the foo
 | `:keygen` | Generate a key pair for encrypted repositories |
 | `:rewrap` | Wrap the key of the open repository with a new public key |
 | `:rekey` | Encrypt every object of the open repository with a new key |
+| `:check` | Check the integrity of the open repository: structure, all data or a part of it |
 | `:forget` | Forget snapshots with a retention policy, after a preview |
 | `:prune` | Free the space of the objects no snapshot uses, after showing the plan |
 | `:unlock` | Remove the stale locks of the open repository |
@@ -250,6 +252,16 @@ While an operation is running, `Esc` cancels it. Creating, verifying and restori
 Forgetting only removes the snapshots from the list: their contents stay in the repository until a prune. `:prune` lists every object (slow on S3 and GCS) and shows how many objects no snapshot uses, the space they take and the old key generations left by `:rekey`, and removes them after a confirmation. If some objects used by snapshots are missing, it says so: those snapshots are damaged. Prune takes an exclusive lock on the repository.
 
 Stowmark has no command to forget a single snapshot, so the console does not offer one.
+
+### Repository check
+
+`:check` asks what to check:
+
+- **Structure only** (`s`): reads every manifest and lists the objects to find the missing and unreferenced ones. It is fast and does not need the private key.
+- **All data** (`d`): also reads and verifies every object, with a progress bar. It reads the whole repository, and an encrypted repository needs its private key.
+- **Part of the data** (`p`): reads a subset of the objects, such as `10%` (a random sample) or `2/5` (the second of five slices, to spread a full read over several runs).
+
+The result screen shows the totals, the damaged snapshots (corrupt manifests or missing objects), the errors and the warnings. Warnings have shortcuts: `p` plans a prune when there are unreferenced objects or old key generations, and `u` removes stale locks. `r` checks again with the same choice. Stowmark removes stale locks itself when the check takes its lock, so they rarely show up.
 
 ### Locks
 

@@ -223,7 +223,7 @@ func (m *Model) openPruneConfirmation(plan *retention.PrunePlan) {
 		"Referenced objects", plan.ReferencedObjects,
 		"Unreferenced objects", plan.UnreferencedObjects, formatSize(plan.UnreferencedBytes))
 	if len(plan.OldKeyGenerations) > 0 {
-		body += fmt.Sprintf("\n%-22s%s", "Old key generations", generations(plan.OldKeyGenerations))
+		body += fmt.Sprintf("\n%-22s%s", "Old key generations", formatGenerations(plan.OldKeyGenerations))
 	}
 	body += "\n\nPrune takes an exclusive lock: no other Stowmark process may use the\nrepository meanwhile."
 
@@ -242,7 +242,7 @@ func pruneSummary(result *retention.PruneResult) string {
 		plural(result.RemovedObjects, "object"), formatSize(result.FreedBytes))}
 
 	if len(result.RemovedKeyGenerations) > 0 {
-		parts = append(parts, "removed key generations "+generations(result.RemovedKeyGenerations))
+		parts = append(parts, "removed key generations "+formatGenerations(result.RemovedKeyGenerations))
 	}
 	if result.RemovedTemporaryFiles > 0 {
 		parts = append(parts, "removed "+plural(result.RemovedTemporaryFiles, "temporary file"))
@@ -259,7 +259,7 @@ func pruneSummary(result *retention.PruneResult) string {
 	return strings.Join(parts, "; ")
 }
 
-func generations(values []uint64) string {
+func formatGenerations(values []uint64) string {
 	names := make([]string, len(values))
 	for i, value := range values {
 		names[i] = fmt.Sprintf("%d", value)

@@ -7,6 +7,7 @@ import (
 	"github.com/bruli-lab/go-core/cqs"
 	"github.com/bruli-lab/stowmark-console/internal/app"
 	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
+	"github.com/bruli-lab/stowmark-console/internal/domain/integrity"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
@@ -65,6 +66,11 @@ func failingBuses() app.Buses {
 		Snapshots:    snapshots,
 		Keys:         keys,
 		Retention:    retentionRepository,
+		Checker: &mocks.CheckerMock{
+			CheckFunc: func(context.Context, integrity.Scope) (integrity.Report, error) {
+				return integrity.Report{}, errBackend
+			},
+		},
 	})
 }
 
@@ -103,6 +109,7 @@ func TestNewBuses(t *testing.T) {
 		app.RepositoryStatusQuery{},
 		app.PlanForgetQuery{Rules: retention.Rules{Last: 1}},
 		app.PlanPruneQuery{},
+		app.CheckRepositoryQuery{Scope: integrity.StructureOnly()},
 		app.ListSnapshotsQuery{},
 		app.GetManifestQuery{SnapshotID: "snap"},
 		app.GetFileContentQuery{SnapshotID: "snap", Path: "/data/a.txt", MaxSize: 1},

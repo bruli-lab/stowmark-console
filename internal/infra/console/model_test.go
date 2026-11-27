@@ -18,6 +18,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/bruli-lab/stowmark-console/internal/app"
 	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
+	"github.com/bruli-lab/stowmark-console/internal/domain/integrity"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
@@ -41,6 +42,8 @@ type harness struct {
 	keys          *mocks.KeysMock
 	lockReport    repository.LockReport
 	retention     *mocks.RetentionRepositoryMock
+	checker       *mocks.CheckerMock
+	checkReport   integrity.Report
 }
 
 var errUnreachable = errors.New("unreachable")
@@ -112,12 +115,16 @@ func newHarness(t *testing.T, initialized bool) *harness {
 			return retention.PruneResult{}, nil
 		},
 	}
+	h.checker = &mocks.CheckerMock{
+		CheckFunc: func(context.Context, integrity.Scope) (integrity.Report, error) { return h.checkReport, nil },
+	}
 	buses := app.NewBuses(&app.Ports{
 		Catalog:      h.catalog,
 		Repositories: repositories,
 		Snapshots:    snapshots,
 		Keys:         h.keys,
 		Retention:    h.retention,
+		Checker:      h.checker,
 	})
 	h.openDirectory = t.TempDir()
 	model := New(t.Context(), buses, WithFileOpener(h.openDirectory, func(path string) error {

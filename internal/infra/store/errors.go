@@ -29,6 +29,7 @@ var encryptionMessages = []struct {
 	message string
 	domain  error
 }{
+	{message: "private key is required to read the data", domain: encryption.ErrPrivateKeyRequired},
 	{message: "decrypt symmetric key", domain: encryption.ErrWrongPrivateKey},
 	{message: "decrypt metadata key", domain: encryption.ErrWrongPrivateKey},
 	{message: "read private key", domain: encryption.ErrPrivateKeyUnreadable},

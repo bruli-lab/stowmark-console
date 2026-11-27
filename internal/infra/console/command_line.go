@@ -55,6 +55,12 @@ var consoleCommands = []consoleCommand{
 		run:       func() tea.Cmd { return emit(rekeyRequested{}) },
 	},
 	{
+		names:   []string{"check"},
+		listed:  true,
+		summary: "Check integrity",
+		run:     func() tea.Cmd { return emit(checkRequested{}) },
+	},
+	{
 		names:   []string{"forget"},
 		listed:  true,
 		summary: "Apply a retention",

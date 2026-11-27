@@ -110,6 +110,9 @@ func (m *Model) handleIntent(msg tea.Msg) (tea.Cmd, bool) {
 		if cmd, handled := m.handleRetentionIntent(msg); handled {
 			return cmd, true
 		}
+		if cmd, handled := m.handleCheckIntent(msg); handled {
+			return cmd, true
+		}
 		return m.handleOperationIntent(msg)
 	}
 
@@ -157,6 +160,8 @@ func (m *Model) handleOperationIntent(msg tea.Msg) (tea.Cmd, bool) {
 		start = m.planPrune
 	case pruneConfirmed:
 		start = m.pruneRepository
+	case checkScopeChosen:
+		start = func() tea.Cmd { return m.runCheck(msg.scope) }
 	default:
 		return nil, false
 	}
