@@ -86,6 +86,10 @@ func (m *Model) handleIntent(msg tea.Msg) (tea.Cmd, bool) {
 		m.screens = nil
 	case repositoriesScreenRequested:
 		m.showRepositories()
+	case encryptedInitRequested:
+		m.openEncryptedInitDialog()
+	case initConfirmationRequested:
+		m.openInitConfirmation()
 	case repositoryInitDeclined:
 		if len(m.repositories) < 2 {
 			return tea.Quit, true
@@ -128,6 +132,8 @@ func (m *Model) handleOperationIntent(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case repositoryInitConfirmed:
 		start = m.initRepository
+	case encryptedInitFolderChosen:
+		start = func() tea.Cmd { return m.initEncryptedRepository(msg.folder) }
 	case repositoryOpenRequested:
 		start = func() tea.Cmd { return m.openRepository(msg.name) }
 	case snapshotsRefreshRequested:

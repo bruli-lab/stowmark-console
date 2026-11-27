@@ -248,6 +248,31 @@ func (m *Model) openInitConfirmation() {
 		body.WriteString("\n\n" + mutedStyle.Render(note))
 	}
 
+	if !m.current.Encrypted() {
+		m.dialog = &choiceDialog{
+			title: "Initialize repository " + m.current.Name(),
+			body:  body.String(),
+			note:  initRepositoryWarning(m.current),
+			choices: []choice{
+				{
+					key:         "y",
+					label:       "Initialize",
+					description: "as configured, without encryption",
+					cmd:         emit(repositoryInitConfirmed{}),
+				},
+				{
+					key:         "e",
+					label:       "Initialize encrypted",
+					description: "generates a new key pair and uses format version 3",
+					cmd:         emit(encryptedInitRequested{}),
+				},
+			},
+			cancelHint: declineHint,
+			onCancel:   emit(repositoryInitDeclined{}),
+		}
+		return
+	}
+
 	m.dialog = &confirmDialog{
 		title:     "Initialize repository " + m.current.Name(),
 		body:      body.String(),

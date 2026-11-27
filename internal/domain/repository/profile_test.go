@@ -122,6 +122,22 @@ func TestProfileRetention(t *testing.T) {
 		require.Equal(t, rules, configured)
 	})
 
+	t.Run(`Given an unencrypted profile
+	When it gets a key pair
+	Then it is encrypted with format version 3, keeps its compression and has the private key`, func(t *testing.T) {
+		t.Parallel()
+		base := repository.NewProfile("nas", "/backups", repository.NewInitOptions("zstd", nil, nil))
+
+		profile := base.WithKeys("/keys/a-public.pem", "/keys/a-private.pem")
+
+		require.True(t, profile.Encrypted())
+		require.False(t, profile.MissingPrivateKey())
+		require.True(t, profile.Init().EncryptsMetadata())
+		require.Equal(t, "zstd", profile.Init().Compression())
+		require.Equal(t, "/keys/a-private.pem", *profile.PrivateKey())
+		require.False(t, base.Encrypted())
+	})
+
 	t.Run(`Given a profile with retention rules and exclusions
 	When both are asked
 	Then each keeps its value`, func(t *testing.T) {

@@ -10,4 +10,5 @@ var ErrUnknownProfile = errors.New("unknown repository")
 type Catalog interface {
 	Profiles() []Profile
 	Open(ctx context.Context, name string) (Profile, error)
+	Update(ctx context.Context, profile Profile) (Profile, error)
 }

@@ -41,6 +41,9 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 		}
 		return m.applyStatus(msg.status)
 
+	case encryptedRepositoryInitializedMsg:
+		return m.handleEncryptedInitialized(&msg)
+
 	case repositoryInitializedMsg:
 		m.finishOperation()
 		if m.fail("initialize repository", msg.err) {

@@ -97,6 +97,9 @@ func newHarness(t *testing.T, initialized bool) *harness {
 			}
 			return repository.Profile{}, errUnreachable
 		},
+		UpdateFunc: func(_ context.Context, profile repository.Profile) (repository.Profile, error) {
+			return profile.WithFingerprint(fingerprint), nil
+		},
 	}
 	h.keys = &mocks.KeysMock{
 		GenerateFunc: func(_ context.Context, generation *encryption.KeyGeneration) (encryption.KeyPair, error) {
@@ -240,8 +243,9 @@ func TestConsoleStartup(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
 
-		require.NotNil(t, h.confirmation())
+		require.NotNil(t, h.choice())
 		require.Contains(t, h.view(), "zstd")
+		require.Contains(t, h.view(), "[e] Initialize encrypted")
 		require.Empty(t, h.repositories.InitializeCalls())
 	})
 
@@ -265,7 +269,7 @@ func TestConsoleStartup(t *testing.T) {
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.NotNil(t, h.confirmation())
+		require.NotNil(t, h.choice())
 		require.Empty(t, h.repositories.InitializeCalls())
 	})
 

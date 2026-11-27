@@ -8,7 +8,7 @@ import (
 
 func encryptionSummary(options repository.InitOptions) string {
 	if !options.Encrypted() {
-		return "none (set a public key to enable it)"
+		return "none"
 	}
 
 	return "public key " + *options.PublicKey()

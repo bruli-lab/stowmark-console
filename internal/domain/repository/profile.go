@@ -38,6 +38,13 @@ func NewProfile(name, location string, init InitOptions) Profile {
 	return Profile{name: name, location: location, init: &init}
 }
 
+func (p Profile) WithKeys(publicKey, privateKey string) Profile {
+	init := p.Init().WithPublicKey(publicKey).WithFormatVersion(LatestFormatVersion)
+	p.init = &init
+	p.privateKey = &privateKey
+	return p
+}
+
 func (p Profile) WithPrivateKey(path *string) Profile {
 	p.privateKey = path
 	return p

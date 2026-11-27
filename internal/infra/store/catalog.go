@@ -55,6 +55,24 @@ func (c *Catalog) Open(ctx context.Context, name string) (repository.Profile, er
 	return profile.WithFingerprint(keyFingerprint(profile.Init().PublicKey(), profile.PrivateKey())), nil
 }
 
+func (c *Catalog) Update(ctx context.Context, profile repository.Profile) (repository.Profile, error) {
+	entry, found := c.find(profile.Name())
+	if !found {
+		return repository.Profile{}, fmt.Errorf("%w %q", repository.ErrUnknownProfile, profile.Name())
+	}
+
+	previous := entry.Profile
+	entry.Profile = profile
+
+	opened, err := c.Open(ctx, profile.Name())
+	if err != nil {
+		entry.Profile = previous
+		return repository.Profile{}, err
+	}
+
+	return opened, nil
+}
+
 func (c *Catalog) find(name string) (*Entry, bool) {
 	for i := range c.entries {
 		if c.entries[i].Profile.Name() == name {

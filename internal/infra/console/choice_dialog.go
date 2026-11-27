@@ -15,11 +15,12 @@ type choice struct {
 }
 
 type choiceDialog struct {
-	title    string
-	body     string
-	note     string
-	choices  []choice
-	onCancel tea.Cmd
+	title      string
+	body       string
+	note       string
+	choices    []choice
+	cancelHint string
+	onCancel   tea.Cmd
 }
 
 func (d *choiceDialog) update(msg tea.Msg) (bool, tea.Cmd) {
@@ -28,15 +29,15 @@ func (d *choiceDialog) update(msg tea.Msg) (bool, tea.Cmd) {
 		return false, nil
 	}
 
-	switch key.String() {
-	case "esc", "q", "ctrl+c":
-		return true, d.onCancel
-	}
-
 	for _, option := range d.choices {
 		if key.String() == option.key {
 			return true, option.cmd
 		}
+	}
+
+	switch key.String() {
+	case "esc", "q", "n", "ctrl+c":
+		return true, d.onCancel
 	}
 
 	return false, nil
@@ -60,7 +61,11 @@ func (d *choiceDialog) view() string {
 		builder.WriteString("\n" + errorStyle.Render(d.note) + "\n")
 	}
 
-	builder.WriteString("\n[Esc] Cancel")
+	cancelHint := d.cancelHint
+	if cancelHint == "" {
+		cancelHint = "Cancel"
+	}
+	builder.WriteString("\n[Esc] " + cancelHint)
 
 	return builder.String()
 }
