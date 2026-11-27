@@ -105,7 +105,8 @@ tasks:
       - |
         set -euo pipefail
         echo "🧪 Running integration tests (JSON → tparse)..."
-        go test -tags integration -count=1 ./internal/infra/store/... -json -cover | go tool tparse -all
+        go test -tags integration -count=1 ./internal/infra/store/... -json -cover \
+          -coverpkg=./internal/infra/store/... -coverprofile=coverage-integration.out | go tool tparse -all
 
   fmt:
     desc: Format the code with gofumpt

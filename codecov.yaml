@@ -1,0 +1,10 @@
+ignore:
+  - "cmd/**"
+  - "internal/mocks/**"
+  - "internal/fixtures/**"
+
+flags:
+  unit:
+    carryforward: true
+  integration:
+    carryforward: true
