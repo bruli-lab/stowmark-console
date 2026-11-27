@@ -105,6 +105,10 @@ repositories:
     url: ~/backups/stowmark
     compression: zstd
     compression_level: 3
+    retention:
+      keep_last: 7
+      keep_daily: 14
+      keep_monthly: 12
   - name: nas
     url: smb://pablo@nas:445/backups/stowmark
     env:
@@ -127,6 +131,7 @@ repositories:
 | `private_key`, `public_key` | no | Same as `STOWMARK_PRIVATE_KEY` and `STOWMARK_PUBLIC_KEY` |
 | `compression`, `compression_level` | no | Same as `STOWMARK_COMPRESSION` and `STOWMARK_COMPRESSION_LEVEL` |
 | `format_version` | no | Same as `STOWMARK_FORMAT_VERSION` |
+| `retention` | no | Keep rules that prefill `:forget`: `keep_last`, `keep_daily`, `keep_weekly`, `keep_monthly`, `keep_yearly` and `keep_within` (`30d`, `2w`, `36h`) |
 | `env` | no | Environment variables set while the repository is open, such as the credentials of a remote backend |
 
 When `STOWMARK_REPOSITORY` is set, it is added first as the `default` repository with the options of the environment variables. With a single repository, the console opens it on start. With several, it starts on the repositories list so you can choose which one to open. `:repo` lists them all again, marks the current one and opens the selected one: its `env` variables replace those of the previous repository. Keep the file readable only by you (`chmod 600`) when it holds credentials.
@@ -219,6 +224,8 @@ Press `:` in any view, type a command and press `Enter`. While you type, the foo
 | `:keygen` | Generate a key pair for encrypted repositories |
 | `:rewrap` | Wrap the key of the open repository with a new public key |
 | `:rekey` | Encrypt every object of the open repository with a new key |
+| `:forget` | Forget snapshots with a retention policy, after a preview |
+| `:prune` | Free the space of the objects no snapshot uses, after showing the plan |
 | `:unlock` | Remove the stale locks of the open repository |
 | `:unlock!` | Remove every lock of the open repository, after a confirmation |
 
@@ -230,6 +237,20 @@ Restoring asks for a destination directory first. It defaults to `~/stowmark-res
 
 While an operation is running, `Esc` cancels it. Creating, verifying and restoring snapshots and `:rekey` show a progress bar in the footer with the stage, the files (or objects) and bytes done, the speed and the estimated remaining time.
 
+### Retention and space
+
+`:forget` opens a form with the keep rules, prefilled with the `retention` of the repository when the repositories file has one. A snapshot is kept when any rule matches it, and Stowmark applies the rules to the snapshots of each source on its own:
+
+- **Last**: the newest snapshots.
+- **Daily**, **Weekly**, **Monthly**, **Yearly**: the newest snapshot of each of the last N days, weeks, months or years that have snapshots.
+- **Within**: every snapshot newer than a duration, such as `30d`, `2w` or `36h`.
+
+`Enter` shows the plan: every snapshot, grouped by source, marked as kept (with the rules that keep it) or forgotten. Nothing changes until you press `f` (forget) or `p` (forget and prune) and confirm. Forgotten snapshots cannot be restored. In S3 and GCS repositories with object lock, snapshots still under retention are kept and the result says until when.
+
+Forgetting only removes the snapshots from the list: their contents stay in the repository until a prune. `:prune` lists every object (slow on S3 and GCS) and shows how many objects no snapshot uses, the space they take and the old key generations left by `:rekey`, and removes them after a confirmation. If some objects used by snapshots are missing, it says so: those snapshots are damaged. Prune takes an exclusive lock on the repository.
+
+Stowmark has no command to forget a single snapshot, so the console does not offer one.
+
 ### Locks
 
 Stowmark locks the repository while it works on it: several readers can share it, but a command that changes the repository (creating a snapshot, rotating keys, pruning) needs it alone. A lock becomes stale 30 minutes after its last refresh, for example when a process crashed, and Stowmark removes stale locks by itself on the next command.
@@ -240,7 +261,7 @@ When the repository is locked by another process, the error shows who holds the 
 
 The project follows a hexagonal architecture:
 
-- `internal/domain`: entities, aggregates, value objects, events and ports (`repository`, `snapshot`, `encryption`, `progress`). Events and aggregates are built on [go-core](https://github.com/bruli-lab/go-core) `event`.
+- `internal/domain`: entities, aggregates, value objects, events and ports (`repository`, `snapshot`, `encryption`, `retention`, `progress`). Events and aggregates are built on [go-core](https://github.com/bruli-lab/go-core) `event`.
 - `internal/app`: one query or command handler per use case on go-core `cqs`, subscribed to a command bus and a query bus (`app.NewBuses`). Commands return domain events.
 - `internal/infra/store`: adapter that implements the ports on top of the Stowmark library, with a single handler per session.
 - `internal/infra/console`: the terminal user interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) v2, which only talks to the application layer. A root model keeps a stack of screens (snapshots, files, preview) and the active dialog; screens emit intent messages and the root model runs the use cases.

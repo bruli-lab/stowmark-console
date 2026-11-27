@@ -8,6 +8,7 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/app"
 	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/mocks"
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,24 @@ func failingBuses() app.Buses {
 		RotateFunc: func(context.Context, *encryption.Rotation) error { return errBackend },
 	}
 
-	return app.NewBuses(app.Ports{Catalog: catalog, Repositories: repositories, Snapshots: snapshots, Keys: keys})
+	retentionRepository := &mocks.RetentionRepositoryMock{
+		PlanForgetFunc: func(context.Context, retention.Policy) (retention.Plan, error) { return nil, errBackend },
+		ForgetFunc: func(context.Context, *retention.Forgetting) (retention.ForgetResult, error) {
+			return retention.ForgetResult{}, errBackend
+		},
+		PlanPruneFunc: func(context.Context) (retention.PrunePlan, error) { return retention.PrunePlan{}, errBackend },
+		PruneFunc: func(context.Context, *retention.Pruning) (retention.PruneResult, error) {
+			return retention.PruneResult{}, errBackend
+		},
+	}
+
+	return app.NewBuses(&app.Ports{
+		Catalog:      catalog,
+		Repositories: repositories,
+		Snapshots:    snapshots,
+		Keys:         keys,
+		Retention:    retentionRepository,
+	})
 }
 
 func TestNewBuses(t *testing.T) {
@@ -59,6 +77,8 @@ func TestNewBuses(t *testing.T) {
 		app.OpenRepositoryCommand{RepositoryName: "nas"},
 		app.InitRepositoryCommand{},
 		app.UnlockRepositoryCommand{All: true},
+		app.ForgetSnapshotsCommand{Rules: retention.Rules{Last: 1}},
+		app.PruneRepositoryCommand{},
 		app.CreateSnapshotCommand{Source: "/data"},
 		app.VerifySnapshotCommand{SnapshotID: "snap"},
 		app.RestoreSnapshotCommand{SnapshotID: "snap", Destination: "/restore"},
@@ -81,6 +101,8 @@ func TestNewBuses(t *testing.T) {
 
 	queries := []cqs.Query{
 		app.RepositoryStatusQuery{},
+		app.PlanForgetQuery{Rules: retention.Rules{Last: 1}},
+		app.PlanPruneQuery{},
 		app.ListSnapshotsQuery{},
 		app.GetManifestQuery{SnapshotID: "snap"},
 		app.GetFileContentQuery{SnapshotID: "snap", Path: "/data/a.txt", MaxSize: 1},

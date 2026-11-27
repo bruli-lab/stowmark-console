@@ -12,6 +12,7 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/buildinfo"
 	"github.com/bruli-lab/stowmark-console/internal/config"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
 	"github.com/bruli-lab/stowmark-console/internal/infra/console"
 	"github.com/bruli-lab/stowmark-console/internal/infra/desktop"
 	"github.com/bruli-lab/stowmark-console/internal/infra/stderr"
@@ -62,11 +63,12 @@ func runConsole(conf *config.Config) (err error) {
 	defer func() { err = errors.Join(err, session.Close()) }()
 
 	catalog := store.NewCatalog(session, catalogEntries(conf.Repositories))
-	buses := app.NewBuses(app.Ports{
+	buses := app.NewBuses(&app.Ports{
 		Catalog:      catalog,
 		Repositories: store.NewRepositories(session),
 		Snapshots:    store.NewSnapshots(session),
 		Keys:         store.NewKeys(session),
+		Retention:    store.NewRetention(session),
 	})
 	openDirectory, err := os.MkdirTemp("", "stowmark-console-open-*")
 	if err != nil {
@@ -98,10 +100,25 @@ func catalogEntries(repositories []config.Repository) []store.Entry {
 				repo.URL,
 				repository.NewInitOptions(repo.Compression, repo.CompressionLevel, repo.PublicKey).
 					WithFormatVersion(repo.FormatVersion),
-			).WithPrivateKey(repo.PrivateKey),
+			).WithPrivateKey(repo.PrivateKey).WithRetention(retentionRules(repo.Retention)),
 			Environment: repo.Env,
 		}
 	}
 
 	return entries
+}
+
+func retentionRules(configured *config.Retention) *retention.Rules {
+	if configured == nil {
+		return nil
+	}
+
+	return &retention.Rules{
+		Last:    configured.KeepLast,
+		Daily:   configured.KeepDaily,
+		Weekly:  configured.KeepWeekly,
+		Monthly: configured.KeepMonthly,
+		Yearly:  configured.KeepYearly,
+		Within:  configured.Within,
+	}
 }
