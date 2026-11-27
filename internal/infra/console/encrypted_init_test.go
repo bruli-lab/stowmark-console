@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -47,8 +46,6 @@ func containsValue(form *initForm, field initField, value string) bool {
 		return form.compressionName() == value
 	case initEncryption:
 		return form.encryptionName() == value
-	case initFormat:
-		return strconv.Itoa(form.format) == value
 	case initLevel, initKeysFolder:
 	}
 	return false
@@ -125,28 +122,16 @@ func TestConsoleInitForm(t *testing.T) {
 		require.Empty(t, h.repositories.InitializeCalls())
 	})
 
-	t.Run(`Given the init form with a new key pair
-	When the user lowers the format version
-	Then it recommends format version 3`, func(t *testing.T) {
-		t.Parallel()
-		h := newHarness(t, false).started()
-		h.chooseInit(t, initEncryption, encryptionNewKeys)
-
-		h.chooseInit(t, initFormat, "2")
-
-		require.Contains(t, h.view(), "Format version 3 is recommended")
-	})
-
 	t.Run(`Given the init form
-	When the user changes the format version
-	Then the repository is initialized with it`, func(t *testing.T) {
+	When the repository is initialized
+	Then it uses the latest format version and the form does not offer another one`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
+		require.NotContains(t, h.view(), "Format")
 
-		h.chooseInit(t, initFormat, "3")
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.Equal(t, 3, h.repositories.InitializeCalls()[0].Options.FormatVersion())
+		require.Equal(t, repository.LatestFormatVersion, h.repositories.InitializeCalls()[0].Options.FormatVersion())
 	})
 }
 
@@ -155,13 +140,12 @@ func TestConsoleEncryptedInit(t *testing.T) {
 
 	t.Run(`Given the init form of a repository without public key
 	When the user chooses a new key pair
-	Then the format becomes version 3 and it asks for the keys folder, prefilled with the default one`, func(t *testing.T) {
+	Then it asks for the keys folder, prefilled with the default one`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
 
 		h.chooseInit(t, initEncryption, encryptionNewKeys)
 
-		require.Equal(t, repository.LatestFormatVersion, h.initForm().format)
 		require.Contains(t, h.initForm().visible(), initKeysFolder)
 		require.Equal(t, defaultKeysFolder(), h.initForm().keysFolder.Value())
 		require.Empty(t, h.keys.GenerateCalls())
@@ -186,7 +170,7 @@ func TestConsoleEncryptedInit(t *testing.T) {
 		require.Equal(t, filepath.Join(folder, "1234-private.pem"), *h.model.current.PrivateKey())
 		require.Equal(t, fingerprint, h.model.current.Fingerprint())
 		require.Len(t, h.snapshots.ListCalls(), 1)
-		require.Contains(t, h.model.message, "initialized encrypted (format version 3)")
+		require.Contains(t, h.model.message, "Repository default initialized encrypted")
 	})
 
 	t.Run(`Given the default repository initialized encrypted

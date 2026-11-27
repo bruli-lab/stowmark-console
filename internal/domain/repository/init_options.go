@@ -8,7 +8,6 @@ import (
 
 const (
 	NoCompression        = "none"
-	DefaultFormatVersion = 2
 	LatestFormatVersion  = 3
 	MinimumFormatVersion = 1
 )
@@ -97,7 +96,7 @@ func (o InitOptions) Encrypted() bool {
 
 func (o InitOptions) FormatVersion() int {
 	if o.formatVersion == 0 {
-		return DefaultFormatVersion
+		return LatestFormatVersion
 	}
 
 	return o.formatVersion

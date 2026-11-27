@@ -25,7 +25,6 @@ type initField int
 const (
 	initCompression initField = iota
 	initLevel
-	initFormat
 	initEncryption
 	initKeysFolder
 )
@@ -38,7 +37,6 @@ type initForm struct {
 	publicKey   *string
 	compression int
 	level       textinput.Model
-	format      int
 	encryption  int
 	encryptions []string
 	keysFolder  textinput.Model
@@ -57,7 +55,6 @@ func newInitForm(profile *repository.Profile, warning, declineHint string) *init
 		publicKey:   options.PublicKey(),
 		compression: max(0, slices.Index(repository.Compressions(), options.Compression())),
 		level:       newInput("", levelText(options.CompressionLevel()), initLevelWidth),
-		format:      options.FormatVersion(),
 		encryptions: []string{encryptionNone, encryptionNewKeys},
 		keysFolder:  newInput("", defaultKeysFolder(), initFolderWidth),
 	}
@@ -92,7 +89,7 @@ func (f *initForm) visible() []initField {
 	if _, ok := repository.LevelsOf(f.compressionName()); ok {
 		fields = append(fields, initLevel)
 	}
-	fields = append(fields, initFormat, initEncryption)
+	fields = append(fields, initEncryption)
 	if f.encryptionName() == encryptionNewKeys {
 		fields = append(fields, initKeysFolder)
 	}
@@ -110,7 +107,7 @@ func (f *initForm) focusField(field initField) {
 		f.level.Focus()
 	case initKeysFolder:
 		f.keysFolder.Focus()
-	case initCompression, initFormat, initEncryption:
+	case initCompression, initEncryption:
 	}
 }
 
@@ -126,14 +123,8 @@ func (f *initForm) cycle(step int) {
 		count := len(repository.Compressions())
 		f.compression = (f.compression + step + count) % count
 		f.level.SetValue("")
-	case initFormat:
-		span := repository.LatestFormatVersion - repository.MinimumFormatVersion + 1
-		f.format = (f.format-repository.MinimumFormatVersion+step+span)%span + repository.MinimumFormatVersion
 	case initEncryption:
 		f.encryption = (f.encryption + step + len(f.encryptions)) % len(f.encryptions)
-		if f.encryptionName() == encryptionNewKeys {
-			f.format = repository.LatestFormatVersion
-		}
 	case initLevel, initKeysFolder:
 	}
 }
@@ -166,7 +157,7 @@ func (f *initForm) update(msg tea.Msg) (bool, tea.Cmd) {
 		f.level, cmd = f.level.Update(msg)
 	case initKeysFolder:
 		f.keysFolder, cmd = f.keysFolder.Update(msg)
-	case initCompression, initFormat, initEncryption:
+	case initCompression, initEncryption:
 	}
 	f.err = nil
 
@@ -188,7 +179,7 @@ func (f *initForm) options() (repository.InitOptions, error) {
 		publicKey = nil
 	}
 
-	options := repository.NewInitOptions(f.compressionName(), level, publicKey).WithFormatVersion(f.format)
+	options := repository.NewInitOptions(f.compressionName(), level, publicKey)
 
 	return options, options.Validate()
 }
@@ -222,7 +213,7 @@ func (f *initForm) view() string {
 
 	builder.WriteString(headerStyle.Render(f.title) + "\n\n")
 	builder.WriteString("No Stowmark repository found at:\n" + highlightStyle.Render(f.location) + "\n\n")
-	builder.WriteString(mutedStyle.Render("Prefilled with the configuration. Compression and format cannot change later.") + "\n\n")
+	builder.WriteString(mutedStyle.Render("Prefilled with the configuration. The compression cannot change later.") + "\n\n")
 
 	for _, field := range f.visible() {
 		builder.WriteString(f.row(field) + "\n")
@@ -247,7 +238,6 @@ func (f *initForm) row(field initField) string {
 	labels := map[initField]string{
 		initCompression: "Compression",
 		initLevel:       "Level",
-		initFormat:      "Format",
 		initEncryption:  "Encryption",
 		initKeysFolder:  "Keys folder",
 	}
@@ -266,8 +256,6 @@ func (f *initForm) row(field initField) string {
 		return label + inputStyle.Width(initFolderWidth+3).Render(f.keysFolder.View())
 	case initCompression:
 		return label + f.selector(field, f.compressionName()) + "  " + mutedStyle.Render(strings.Join(repository.Compressions(), ", "))
-	case initFormat:
-		return label + f.selector(field, "version "+strconv.Itoa(f.format))
 	case initEncryption:
 		value := f.encryptionName()
 		if value == encryptionConfigured {
@@ -293,8 +281,6 @@ func (f *initForm) choices(field initField) []string {
 		return repository.Compressions()
 	case initEncryption:
 		return f.encryptions
-	case initFormat:
-		return []string{"1", "2", "3"}
 	case initLevel, initKeysFolder:
 	}
 
@@ -302,13 +288,10 @@ func (f *initForm) choices(field initField) []string {
 }
 
 func (f *initForm) note() string {
-	encrypted := f.encryptionName() != encryptionNone
-	switch {
-	case encrypted && f.format < repository.LatestFormatVersion:
-		return "Format version 3 is recommended for encrypted repositories: it also encrypts the manifests."
-	case f.encryptionName() == encryptionNewKeys:
+	switch f.encryptionName() {
+	case encryptionNewKeys:
 		return "A new key pair is generated in the folder and this session opens the repository with it."
-	case !encrypted:
+	case encryptionNone:
 		return "Without encryption anyone with access to the storage can read the snapshots."
 	}
 

@@ -261,32 +261,19 @@ func TestConsoleEncryptedRepository(t *testing.T) {
 		require.Empty(t, rows[1][2])
 	})
 
-	t.Run(`Given an encrypted repository with format version 2 that is not initialized
-	When the console starts
-	Then the init form shows the format and recommends version 3`, func(t *testing.T) {
-		t.Parallel()
-		h := newHarness(t, false)
-		h.encrypted(t, 2, true)
-
-		h.started()
-
-		view := h.view()
-		require.Contains(t, view, "version 2")
-		require.Contains(t, view, "Format version 3 is recommended")
-	})
-
-	t.Run(`Given an encrypted repository with format version 3 that is not initialized
+	t.Run(`Given a repository configured with a public key that is not initialized
 	When it is initialized
-	Then no format is recommended and the format version reaches the repository`, func(t *testing.T) {
+	Then it uses the configured key and the latest format version`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false)
-		h.encrypted(t, 3, true)
+		keys := h.encrypted(t, 3, true)
 		h.started()
-		require.NotContains(t, h.view(), "is recommended")
 
 		h.pressAndRun(key(tea.KeyEnter))
 
-		require.Equal(t, 3, h.repositories.InitializeCalls()[0].Options.FormatVersion())
+		options := h.repositories.InitializeCalls()[0].Options
+		require.Equal(t, keys.publicKey, *options.PublicKey())
+		require.Equal(t, repository.LatestFormatVersion, options.FormatVersion())
 	})
 }
 

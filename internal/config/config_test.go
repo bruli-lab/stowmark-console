@@ -60,7 +60,6 @@ func TestFromEnvironment(t *testing.T) {
 		require.Nil(t, repo.CompressionLevel)
 		require.Nil(t, repo.PrivateKey)
 		require.Nil(t, repo.PublicKey)
-		require.Equal(t, 2, repo.FormatVersion)
 		require.True(t, strings.HasSuffix(conf.LogFile, filepath.Join("stowmark-console", "console.log")))
 	})
 
@@ -75,7 +74,6 @@ func TestFromEnvironment(t *testing.T) {
 			"STOWMARK_PUBLIC_KEY":        "/keys/public.pem",
 			"STOWMARK_COMPRESSION":       "zstd",
 			"STOWMARK_COMPRESSION_LEVEL": "3",
-			"STOWMARK_FORMAT_VERSION":    "3",
 			"STOWMARK_CONSOLE_LOG_FILE":  "/tmp/console.log",
 		}))
 
@@ -86,24 +84,25 @@ func TestFromEnvironment(t *testing.T) {
 		require.Equal(t, "/keys/public.pem", *repo.PublicKey)
 		require.Equal(t, "zstd", repo.Compression)
 		require.Equal(t, 3, *repo.CompressionLevel)
-		require.Equal(t, 3, repo.FormatVersion)
 		require.Equal(t, "/tmp/console.log", conf.LogFile)
 	})
 
-	for _, version := range []string{"4", "-1"} {
-		t.Run(`Given the format version `+version+`
-		When the configuration is read
-		Then it returns an invalid format version error`, func(t *testing.T) {
-			t.Parallel()
+	t.Run(`Given a repositories file written for an older console with format_version
+	When the configuration is read
+	Then it still loads, because new repositories always use the latest format version`, func(t *testing.T) {
+		t.Parallel()
+		path := repositoriesFile(t, `
+repositories:
+  - name: old
+    url: /backups
+    format_version: 2
+`)
 
-			_, err := config.FromEnvironment(environment(t, map[string]string{
-				"STOWMARK_REPOSITORY":     "/backups",
-				"STOWMARK_FORMAT_VERSION": version,
-			}))
+		conf, err := config.FromEnvironment(map[string]string{"STOWMARK_CONSOLE_CONFIG": path})
 
-			require.ErrorIs(t, err, config.ErrInvalidFormat)
-		})
-	}
+		require.NoError(t, err)
+		require.Equal(t, "old", conf.Repositories[0].Name)
+	})
 
 	t.Run(`Given an unknown compression type
 	When the configuration is read
@@ -153,7 +152,6 @@ repositories:
   - name: laptop
     url: ~/backups
     private_key: ~/.config/stowmark/key
-    format_version: 3
     retention:
       keep_last: 7
       keep_daily: 14
@@ -182,8 +180,6 @@ repositories:
 		require.Equal(t, filepath.Join(home, "backups"), laptop.URL)
 		require.Equal(t, filepath.Join(home, ".config", "stowmark", "key"), *laptop.PrivateKey)
 		require.Equal(t, "none", laptop.Compression)
-		require.Equal(t, 3, laptop.FormatVersion)
-		require.Equal(t, 2, nas.FormatVersion)
 		require.Nil(t, nas.Retention)
 		require.Equal(t, 7, laptop.Retention.KeepLast)
 		require.Equal(t, 14, laptop.Retention.KeepDaily)
