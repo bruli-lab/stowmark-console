@@ -29,6 +29,7 @@ func NewBuses(ports *Ports) Buses {
 	commands.Subscribe(InitRepositoryCommandName, NewInitRepository(ports.Repositories))
 	commands.Subscribe(InitEncryptedRepositoryCommandName,
 		NewInitEncryptedRepository(ports.Catalog, ports.Repositories, ports.Keys))
+	commands.Subscribe(UsePrivateKeyCommandName, NewUsePrivateKey(ports.Catalog))
 	commands.Subscribe(UnlockRepositoryCommandName, NewUnlockRepository(ports.Repositories))
 	commands.Subscribe(ForgetSnapshotsCommandName, NewForgetSnapshots(ports.Retention))
 	commands.Subscribe(PruneRepositoryCommandName, NewPruneRepository(ports.Retention))

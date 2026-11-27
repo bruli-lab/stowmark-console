@@ -95,6 +95,8 @@ func (m *Model) handleIntent(msg tea.Msg) (tea.Cmd, bool) {
 		}
 		m.message = "Repository " + m.current.Name() + " was not initialized"
 		m.showRepositories()
+	case privateKeyDeclined:
+		m.declinePrivateKey()
 	case statusMessage:
 		m.err = nil
 		m.message = msg.text
@@ -135,6 +137,8 @@ func (m *Model) handleOperationIntent(msg tea.Msg) (tea.Cmd, bool) {
 		start = func() tea.Cmd { return m.initEncryptedRepository(msg.folder, msg.options) }
 	case repositoryOpenRequested:
 		start = func() tea.Cmd { return m.openRepository(msg.name) }
+	case privateKeyChosen:
+		start = func() tea.Cmd { return m.usePrivateKey(msg.path) }
 	case snapshotsRefreshRequested:
 		start = func() tea.Cmd { return m.loadSnapshots(msg.selectID) }
 	case snapshotOpenRequested:
