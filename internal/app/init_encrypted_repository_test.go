@@ -44,7 +44,8 @@ func TestInitEncryptedRepository(t *testing.T) {
 	t.Parallel()
 
 	level := 3
-	profile := repository.NewProfile("vault", "/backups", repository.NewInitOptions("zstd", &level, nil))
+	profile := repository.NewProfile("vault", "/backups",
+		repository.NewInitOptions("zstd", &level, nil).WithFormatVersion(repository.LatestFormatVersion))
 
 	t.Run(`Given a command that is not an encrypted init command
 	When it is handled
@@ -104,6 +105,20 @@ func TestInitEncryptedRepository(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, "SHA256:new", opened.Profile.Fingerprint())
 		require.Equal(t, repository.InitializedEventName, events[2].EventName())
+	})
+
+	t.Run(`Given a profile with an invalid compression level
+	When the repository is initialized encrypted
+	Then no key pair is generated`, func(t *testing.T) {
+		t.Parallel()
+		ports := newEncryptedInitPorts()
+		tooHigh := 40
+		invalid := repository.NewProfile("vault", "/backups", repository.NewInitOptions("zstd", &tooHigh, nil))
+
+		_, err := ports.handler().Handle(t.Context(), app.InitEncryptedRepositoryCommand{Profile: invalid, KeysFolder: "/keys"})
+
+		require.ErrorIs(t, err, repository.ErrInvalidCompressionLevel)
+		require.Empty(t, ports.keys.GenerateCalls())
 	})
 
 	t.Run(`Given a repository that cannot be reopened with the new keys

@@ -32,7 +32,9 @@ func TestCatalogUpdate(t *testing.T) {
 		require.NoError(t, err)
 		keys := generateKeys(t)
 
-		updated, err := catalog.Update(t.Context(), profile.WithKeys(keys.PublicKey(), keys.PrivateKey()))
+		updated, err := catalog.Update(t.Context(), profile.
+			WithInit(profile.Init().WithFormatVersion(repository.LatestFormatVersion)).
+			WithKeys(keys.PublicKey(), keys.PrivateKey()))
 		require.NoError(t, err)
 		require.NoError(t, repositories.Initialize(t.Context(), updated.Init()))
 

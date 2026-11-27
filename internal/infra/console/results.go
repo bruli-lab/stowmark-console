@@ -49,6 +49,7 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 		if m.fail("initialize repository", msg.err) {
 			return nil
 		}
+		m.current = m.current.WithInit(msg.event.Options)
 		m.message = "Repository initialized successfully"
 		return m.loadSnapshots("")
 
