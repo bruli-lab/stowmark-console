@@ -1,6 +1,7 @@
 # Stowmark Console
 
 [![CI](https://github.com/bruli-lab/stowmark-console/actions/workflows/release.yml/badge.svg)](https://github.com/bruli-lab/stowmark-console/actions/workflows/release.yml)
+[![Codecov](https://codecov.io/gh/bruli-lab/stowmark-console/branch/main/graph/badge.svg)](https://codecov.io/gh/bruli-lab/stowmark-console)
 [![Release](https://img.shields.io/github/v/release/bruli-lab/stowmark-console)](https://github.com/bruli-lab/stowmark-console/releases)
 [![License](https://img.shields.io/github/license/bruli-lab/stowmark-console)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/bruli-lab/stowmark-console)](go.mod)
