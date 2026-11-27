@@ -38,7 +38,7 @@ func (m *Model) render() string {
 	}
 
 	if m.splash != nil {
-		return m.splash.view(m.width, m.height)
+		return m.splash.view(m.version, m.width, m.height)
 	}
 
 	if m.dialog != nil {
@@ -90,6 +90,9 @@ func (m *Model) renderBody() string {
 
 func (m *Model) renderHeader() string {
 	title := titleStyle.Render("STOWMARK")
+	if m.version != "" {
+		title += " " + mutedStyle.Render(m.version)
+	}
 	if m.current.Name() != "" {
 		title += " " + kindStyle.Render(m.current.Kind())
 		if m.current.Encrypted() {

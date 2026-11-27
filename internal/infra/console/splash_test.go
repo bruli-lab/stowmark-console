@@ -15,7 +15,8 @@ func newSplashHarness(t *testing.T) *harness {
 	t.Helper()
 
 	h := newHarness(t, true)
-	WithSplash("v1.2.3", time.Hour)(h.model)
+	WithVersion("v1.2.3")(h.model)
+	WithSplash(time.Hour)(h.model)
 
 	return h
 }
@@ -89,9 +90,9 @@ func TestConsoleSplash(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(`Given the splash screen in `+tt.name, func(t *testing.T) {
 			t.Parallel()
-			s := &splash{version: "v1.2.3"}
+			s := &splash{}
 
-			view := s.view(tt.width, tt.height)
+			view := s.view("v1.2.3", tt.width, tt.height)
 
 			require.Equal(t, tt.logoLines, logoRows(view))
 			require.Equal(t, tt.height, lipgloss.Height(view))
@@ -112,4 +113,28 @@ func logoRows(view string) int {
 	}
 
 	return rows
+}
+
+func TestConsoleHeaderVersion(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given a console with a version
+	When the header is rendered
+	Then the version follows the name`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true)
+		WithVersion("v1.2.3")(h.model)
+		h.started()
+
+		require.Contains(t, ansi.Strip(h.model.renderHeader()), " STOWMARK  v1.2.3  local  default ")
+	})
+
+	t.Run(`Given a console without a version
+	When the header is rendered
+	Then only the name is shown`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+
+		require.Contains(t, ansi.Strip(h.model.renderHeader()), " STOWMARK   local  default ")
+	})
 }
