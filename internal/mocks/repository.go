@@ -22,8 +22,8 @@ var _ repository.Repository = &RepositoryMock{}
 //			InitializeFunc: func(ctx context.Context, options repository.InitOptions) error {
 //				panic("mock out the Initialize method")
 //			},
-//			InitializedFunc: func(ctx context.Context) (bool, error) {
-//				panic("mock out the Initialized method")
+//			StatusFunc: func(ctx context.Context) (repository.Status, error) {
+//				panic("mock out the Status method")
 //			},
 //		}
 //
@@ -35,8 +35,8 @@ type RepositoryMock struct {
 	// InitializeFunc mocks the Initialize method.
 	InitializeFunc func(ctx context.Context, options repository.InitOptions) error
 
-	// InitializedFunc mocks the Initialized method.
-	InitializedFunc func(ctx context.Context) (bool, error)
+	// StatusFunc mocks the Status method.
+	StatusFunc func(ctx context.Context) (repository.Status, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -47,14 +47,14 @@ type RepositoryMock struct {
 			// Options is the options argument value.
 			Options repository.InitOptions
 		}
-		// Initialized holds details about calls to the Initialized method.
-		Initialized []struct {
+		// Status holds details about calls to the Status method.
+		Status []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
 	}
-	lockInitialize  sync.RWMutex
-	lockInitialized sync.RWMutex
+	lockInitialize sync.RWMutex
+	lockStatus     sync.RWMutex
 }
 
 // Initialize calls InitializeFunc.
@@ -93,34 +93,34 @@ func (mock *RepositoryMock) InitializeCalls() []struct {
 	return calls
 }
 
-// Initialized calls InitializedFunc.
-func (mock *RepositoryMock) Initialized(ctx context.Context) (bool, error) {
-	if mock.InitializedFunc == nil {
-		panic("RepositoryMock.InitializedFunc: method is nil but Repository.Initialized was just called")
+// Status calls StatusFunc.
+func (mock *RepositoryMock) Status(ctx context.Context) (repository.Status, error) {
+	if mock.StatusFunc == nil {
+		panic("RepositoryMock.StatusFunc: method is nil but Repository.Status was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
 	}{
 		Ctx: ctx,
 	}
-	mock.lockInitialized.Lock()
-	mock.calls.Initialized = append(mock.calls.Initialized, callInfo)
-	mock.lockInitialized.Unlock()
-	return mock.InitializedFunc(ctx)
+	mock.lockStatus.Lock()
+	mock.calls.Status = append(mock.calls.Status, callInfo)
+	mock.lockStatus.Unlock()
+	return mock.StatusFunc(ctx)
 }
 
-// InitializedCalls gets all the calls that were made to Initialized.
+// StatusCalls gets all the calls that were made to Status.
 // Check the length with:
 //
-//	len(mockedRepository.InitializedCalls())
-func (mock *RepositoryMock) InitializedCalls() []struct {
+//	len(mockedRepository.StatusCalls())
+func (mock *RepositoryMock) StatusCalls() []struct {
 	Ctx context.Context
 } {
 	var calls []struct {
 		Ctx context.Context
 	}
-	mock.lockInitialized.RLock()
-	calls = mock.calls.Initialized
-	mock.lockInitialized.RUnlock()
+	mock.lockStatus.RLock()
+	calls = mock.calls.Status
+	mock.lockStatus.RUnlock()
 	return calls
 }

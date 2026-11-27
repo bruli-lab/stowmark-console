@@ -17,6 +17,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/bruli-lab/stowmark-console/internal/app"
+	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/fixtures"
@@ -36,6 +37,7 @@ type harness struct {
 	catalog       *mocks.CatalogMock
 	repositories  *mocks.RepositoryMock
 	snapshots     *mocks.SnapshotRepositoryMock
+	keys          *mocks.KeysMock
 }
 
 var errUnreachable = errors.New("unreachable")
@@ -43,8 +45,13 @@ var errUnreachable = errors.New("unreachable")
 func newHarness(t *testing.T, initialized bool) *harness {
 	t.Helper()
 	repositories := &mocks.RepositoryMock{
-		InitializedFunc: func(context.Context) (bool, error) { return initialized, nil },
-		InitializeFunc:  func(context.Context, repository.InitOptions) error { return nil },
+		StatusFunc: func(context.Context) (repository.Status, error) {
+			if initialized {
+				return repository.StatusReady, nil
+			}
+			return repository.StatusUninitialized, nil
+		},
+		InitializeFunc: func(context.Context, repository.InitOptions) error { return nil },
 	}
 	snapshots := &mocks.SnapshotRepositoryMock{
 		ListFunc: func(context.Context) ([]snapshot.Snapshot, error) {
@@ -82,7 +89,17 @@ func newHarness(t *testing.T, initialized bool) *harness {
 			return repository.Profile{}, errUnreachable
 		},
 	}
-	buses := app.NewBuses(h.catalog, repositories, snapshots)
+	h.keys = &mocks.KeysMock{
+		GenerateFunc: func(_ context.Context, generation *encryption.KeyGeneration) (encryption.KeyPair, error) {
+			return encryption.NewKeyPair(
+				filepath.Join(generation.Folder(), "1234-private.pem"),
+				filepath.Join(generation.Folder(), "1234-public.pem"),
+			)
+		},
+		RewrapFunc: func(context.Context, *encryption.Rewrap) error { return nil },
+		RotateFunc: func(context.Context, *encryption.Rotation) error { return nil },
+	}
+	buses := app.NewBuses(app.Ports{Catalog: h.catalog, Repositories: repositories, Snapshots: snapshots, Keys: h.keys})
 	h.openDirectory = t.TempDir()
 	model := New(t.Context(), buses, WithFileOpener(h.openDirectory, func(path string) error {
 		h.opened = append(h.opened, path)
@@ -253,7 +270,9 @@ func TestConsoleStartup(t *testing.T) {
 	Then the error is shown`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, true)
-		h.repositories.InitializedFunc = func(context.Context) (bool, error) { return false, errUnreachable }
+		h.repositories.StatusFunc = func(context.Context) (repository.Status, error) {
+			return repository.StatusUninitialized, errUnreachable
+		}
 
 		h.started()
 

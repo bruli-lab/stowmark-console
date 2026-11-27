@@ -60,7 +60,19 @@ func TestStoreWithRemoteRepositories(t *testing.T) {
 				t.Setenv(key, value)
 			}
 
-			exerciseRepository(t, fmt.Sprintf("%s-it-%d", environment["STOWMARK_REPOSITORY"], runID))
+			exerciseRepository(t, fmt.Sprintf("%s-it-%d", environment["STOWMARK_REPOSITORY"], runID), repositorySetup{})
+		})
+
+		t.Run(`Given a `+backend+` repository encrypted with format version 3
+		When the console store is used against it
+		Then it behaves like a local repository`, func(t *testing.T) {
+			t.Setenv("STOWMARK_LOG_LEVEL", "error")
+			environment := loadBackendEnvironment(t, root, backend)
+			for key, value := range environment {
+				t.Setenv(key, value)
+			}
+
+			exerciseRepository(t, fmt.Sprintf("%s-it-enc-%d", environment["STOWMARK_REPOSITORY"], runID), encryptedSetup(t, 3))
 		})
 	}
 }

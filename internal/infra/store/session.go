@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 
+	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
 	"github.com/bruli-lab/stowmark/pkg/stowmark"
 )
 
 var ErrNotConnected = errors.New("no repository is open")
 
 type Session struct {
-	handler *stowmark.Handler
+	handler           *stowmark.Handler
+	missingPrivateKey bool
 }
 
 func NewSession() *Session {
@@ -39,6 +41,7 @@ func (s *Session) Connect(ctx context.Context, repositoryURL string, privateKey 
 
 	previous := s.handler
 	s.handler = handler
+	s.missingPrivateKey = false
 
 	if previous != nil {
 		return previous.Close()
@@ -53,6 +56,14 @@ func (s *Session) current() (*stowmark.Handler, error) {
 	}
 
 	return s.handler, nil
+}
+
+func (s *Session) writable() error {
+	if s.missingPrivateKey {
+		return encryption.ErrPrivateKeyRequired
+	}
+
+	return nil
 }
 
 func (s *Session) Close() error {

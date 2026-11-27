@@ -2,13 +2,17 @@ package console
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 )
 
 const (
+	lockBadge         = "🔒"
+	minDialogWidth    = 76
 	sidebarTotalWidth = 28
 	minLogoHeight     = 32
 	maxErrorLines     = 3
@@ -33,7 +37,7 @@ func (m *Model) render() string {
 	}
 
 	if m.dialog != nil {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialogStyle.Render(m.dialog.view()))
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, renderDialog(m.dialog.view(), m.width))
 	}
 
 	m.resizeScreens()
@@ -45,6 +49,12 @@ func (m *Model) render() string {
 	sections = append(sections, m.renderFooter())
 
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+}
+
+func renderDialog(content string, maxWidth int) string {
+	width := max(minDialogWidth, lipgloss.Width(content)+dialogStyle.GetHorizontalFrameSize())
+
+	return dialogStyle.Width(min(width, maxWidth)).Render(content)
 }
 
 func (m *Model) contentSize() (width, height int) {
@@ -85,7 +95,11 @@ func (m *Model) renderBody() string {
 func (m *Model) renderHeader() string {
 	title := titleStyle.Render("STOWMARK")
 	if m.current.Name() != "" {
-		title += " " + kindStyle.Render(m.current.Kind()) + " " + highlightStyle.Render(m.current.Name())
+		title += " " + kindStyle.Render(m.current.Kind())
+		if m.current.Encrypted() {
+			title += " " + kindStyle.Render(lockBadge)
+		}
+		title += " " + highlightStyle.Render(m.current.Name())
 	}
 	location := m.current.Location()
 
@@ -137,6 +151,10 @@ func (m *Model) renderSidebar(availableHeight, width int) string {
 		builder.WriteString(renderMenuItem(item, item == current))
 	}
 
+	if m.connected() && m.current.Encrypted() {
+		writeEncryption(&builder, m.current, width)
+	}
+
 	if selected, ok := m.snapshots.selected(); ok {
 		builder.WriteString("\n")
 		builder.WriteString(headerStyle.Render("Snapshot"))
@@ -148,6 +166,22 @@ func (m *Model) renderSidebar(availableHeight, width int) string {
 	}
 
 	return builder.String()
+}
+
+func writeEncryption(builder *strings.Builder, profile repository.Profile, width int) {
+	builder.WriteString("\n")
+	builder.WriteString(headerStyle.Render(lockBadge + " Encrypted"))
+	builder.WriteString("\n\n")
+
+	key := errorStyle.Render("not set")
+	if profile.PrivateKey() != nil {
+		key = truncateLeft(filepath.Base(*profile.PrivateKey()), width)
+	}
+	builder.WriteString(mutedStyle.Render("Private key") + "\n" + key + "\n")
+
+	if fingerprint := profile.Fingerprint(); fingerprint != "" {
+		writeDetail(builder, "Fingerprint", fingerprint, width)
+	}
 }
 
 func writeDetail(builder *strings.Builder, label, value string, width int) {

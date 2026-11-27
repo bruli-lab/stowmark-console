@@ -3,6 +3,6 @@ package repository
 import "context"
 
 type Repository interface {
-	Initialized(ctx context.Context) (bool, error)
+	Status(ctx context.Context) (Status, error)
 	Initialize(ctx context.Context, options InitOptions) error
 }

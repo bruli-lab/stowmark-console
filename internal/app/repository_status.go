@@ -28,5 +28,5 @@ func (h RepositoryStatus) Handle(ctx context.Context, query cqs.Query) (any, err
 		return nil, cqs.NewInvalidQueryError(RepositoryStatusQueryName, query.Name())
 	}
 
-	return h.repository.Initialized(ctx)
+	return h.repository.Status(ctx)
 }

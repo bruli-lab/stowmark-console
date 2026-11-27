@@ -11,7 +11,6 @@ import (
 
 type Entry struct {
 	Profile     repository.Profile
-	PrivateKey  *string
 	Environment map[string]string
 }
 
@@ -45,13 +44,15 @@ func (c *Catalog) Open(ctx context.Context, name string) (repository.Profile, er
 		return repository.Profile{}, err
 	}
 
-	if err := c.session.Connect(ctx, entry.Profile.Location(), entry.PrivateKey); err != nil {
+	profile := entry.Profile
+	if err := c.session.Connect(ctx, profile.Location(), profile.PrivateKey()); err != nil {
 		return repository.Profile{}, errors.Join(err, c.applyEnvironment(c.currentEnvironment()))
 	}
 
+	c.session.missingPrivateKey = profile.MissingPrivateKey()
 	c.current = entry
 
-	return entry.Profile, nil
+	return profile.WithFingerprint(keyFingerprint(profile.Init().PublicKey(), profile.PrivateKey())), nil
 }
 
 func (c *Catalog) find(name string) (*Entry, bool) {

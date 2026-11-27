@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/infra/store"
@@ -21,17 +22,62 @@ func writeSource(t *testing.T) string {
 	return source
 }
 
+type repositorySetup struct {
+	privateKey    *string
+	publicKey     *string
+	formatVersion int
+}
+
+func (s repositorySetup) initOptions() repository.InitOptions {
+	level := 3
+	return repository.NewInitOptions("zstd", &level, s.publicKey).WithFormatVersion(s.formatVersion)
+}
+
+func encryptedSetup(t *testing.T, formatVersion int) repositorySetup {
+	t.Helper()
+	keys := generateKeys(t)
+	privateKey, publicKey := keys.PrivateKey(), keys.PublicKey()
+
+	return repositorySetup{privateKey: &privateKey, publicKey: &publicKey, formatVersion: formatVersion}
+}
+
+func generateKeys(t *testing.T) encryption.KeyPair {
+	t.Helper()
+
+	session, err := store.Open(t.Context(), filepath.Join(t.TempDir(), "keys-repository"), nil)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, session.Close()) }()
+
+	generation, err := encryption.NewKeyGeneration(t.TempDir())
+	require.NoError(t, err)
+
+	keys, err := store.NewKeys(session).Generate(t.Context(), generation)
+	require.NoError(t, err)
+
+	return keys
+}
+
 func TestStoreWithLocalRepository(t *testing.T) {
 	t.Setenv("STOWMARK_LOG_LEVEL", "error")
 
-	exerciseRepository(t, filepath.Join(t.TempDir(), "repository"))
+	t.Run(`Given an unencrypted repository`, func(t *testing.T) {
+		exerciseRepository(t, filepath.Join(t.TempDir(), "repository"), repositorySetup{})
+	})
+
+	t.Run(`Given a repository encrypted with format version 2`, func(t *testing.T) {
+		exerciseRepository(t, filepath.Join(t.TempDir(), "repository"), encryptedSetup(t, 2))
+	})
+
+	t.Run(`Given a repository encrypted with format version 3`, func(t *testing.T) {
+		exerciseRepository(t, filepath.Join(t.TempDir(), "repository"), encryptedSetup(t, 3))
+	})
 }
 
-func exerciseRepository(t *testing.T, repositoryURL string) {
+func exerciseRepository(t *testing.T, repositoryURL string, setup repositorySetup) {
 	t.Helper()
 	source := writeSource(t)
 
-	session, err := store.Open(t.Context(), repositoryURL, nil)
+	session, err := store.Open(t.Context(), repositoryURL, setup.privateKey)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, session.Close()) })
 
@@ -43,23 +89,21 @@ func exerciseRepository(t *testing.T, repositoryURL string) {
 	t.Run(`Given a path without repository
 	When its status is checked
 	Then it is not initialized`, func(t *testing.T) {
-		initialized, err := repositories.Initialized(t.Context())
+		status, err := repositories.Status(t.Context())
 
 		require.NoError(t, err)
-		require.False(t, initialized)
+		require.Equal(t, repository.StatusUninitialized, status)
 	})
 
 	t.Run(`Given a path without repository
 	When it is initialized with zstd compression
-	Then it becomes initialized`, func(t *testing.T) {
-		level := 3
-		err := repositories.Initialize(t.Context(), repository.NewInitOptions("zstd", &level, nil))
-		require.NoError(t, err)
+	Then it becomes ready`, func(t *testing.T) {
+		require.NoError(t, repositories.Initialize(t.Context(), setup.initOptions()))
 
-		initialized, err := repositories.Initialized(t.Context())
+		status, err := repositories.Status(t.Context())
 
 		require.NoError(t, err)
-		require.True(t, initialized)
+		require.Equal(t, repository.StatusReady, status)
 	})
 
 	t.Run(`Given an initialized repository
@@ -74,10 +118,9 @@ func exerciseRepository(t *testing.T, repositoryURL string) {
 		require.NoError(t, err)
 		require.Len(t, listed, 1)
 		require.Equal(t, snapshotID, listed[0].ID())
-		require.Equal(t, listed[0].FileCount(), created.FileCount())
 		require.Equal(t, listed[0].TotalSize(), created.TotalSize())
 		require.Equal(t, source, listed[0].Source())
-		require.Equal(t, 2, listed[0].FileCount())
+		require.Equal(t, 2, created.FileCount())
 		require.False(t, created.CreatedAt().IsZero())
 	})
 

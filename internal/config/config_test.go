@@ -59,6 +59,7 @@ func TestFromEnvironment(t *testing.T) {
 		require.Nil(t, repo.CompressionLevel)
 		require.Nil(t, repo.PrivateKey)
 		require.Nil(t, repo.PublicKey)
+		require.Equal(t, 2, repo.FormatVersion)
 		require.True(t, strings.HasSuffix(conf.LogFile, filepath.Join("stowmark-console", "console.log")))
 	})
 
@@ -73,6 +74,7 @@ func TestFromEnvironment(t *testing.T) {
 			"STOWMARK_PUBLIC_KEY":        "/keys/public.pem",
 			"STOWMARK_COMPRESSION":       "zstd",
 			"STOWMARK_COMPRESSION_LEVEL": "3",
+			"STOWMARK_FORMAT_VERSION":    "3",
 			"STOWMARK_CONSOLE_LOG_FILE":  "/tmp/console.log",
 		}))
 
@@ -83,8 +85,24 @@ func TestFromEnvironment(t *testing.T) {
 		require.Equal(t, "/keys/public.pem", *repo.PublicKey)
 		require.Equal(t, "zstd", repo.Compression)
 		require.Equal(t, 3, *repo.CompressionLevel)
+		require.Equal(t, 3, repo.FormatVersion)
 		require.Equal(t, "/tmp/console.log", conf.LogFile)
 	})
+
+	for _, version := range []string{"4", "-1"} {
+		t.Run(`Given the format version `+version+`
+		When the configuration is read
+		Then it returns an invalid format version error`, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := config.FromEnvironment(environment(t, map[string]string{
+				"STOWMARK_REPOSITORY":     "/backups",
+				"STOWMARK_FORMAT_VERSION": version,
+			}))
+
+			require.ErrorIs(t, err, config.ErrInvalidFormat)
+		})
+	}
 
 	t.Run(`Given an unknown compression type
 	When the configuration is read
@@ -134,6 +152,7 @@ repositories:
   - name: laptop
     url: ~/backups
     private_key: ~/.config/stowmark/key
+    format_version: 3
 `)
 
 		conf, err := config.FromEnvironment(map[string]string{
@@ -154,6 +173,8 @@ repositories:
 		require.Equal(t, filepath.Join(home, "backups"), laptop.URL)
 		require.Equal(t, filepath.Join(home, ".config", "stowmark", "key"), *laptop.PrivateKey)
 		require.Equal(t, "none", laptop.Compression)
+		require.Equal(t, 3, laptop.FormatVersion)
+		require.Equal(t, 2, nas.FormatVersion)
 	})
 
 	t.Run(`Given only a repositories file

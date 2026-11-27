@@ -61,7 +61,12 @@ func runConsole(conf *config.Config) (err error) {
 	defer func() { err = errors.Join(err, session.Close()) }()
 
 	catalog := store.NewCatalog(session, catalogEntries(conf.Repositories))
-	buses := app.NewBuses(catalog, store.NewRepositories(session), store.NewSnapshots(session))
+	buses := app.NewBuses(app.Ports{
+		Catalog:      catalog,
+		Repositories: store.NewRepositories(session),
+		Snapshots:    store.NewSnapshots(session),
+		Keys:         store.NewKeys(session),
+	})
 	openDirectory, err := os.MkdirTemp("", "stowmark-console-open-*")
 	if err != nil {
 		return fmt.Errorf("creating the directory for opened files: %w", err)
@@ -89,9 +94,9 @@ func catalogEntries(repositories []config.Repository) []store.Entry {
 			Profile: repository.NewProfile(
 				repo.Name,
 				repo.URL,
-				repository.NewInitOptions(repo.Compression, repo.CompressionLevel, repo.PublicKey),
-			),
-			PrivateKey:  repo.PrivateKey,
+				repository.NewInitOptions(repo.Compression, repo.CompressionLevel, repo.PublicKey).
+					WithFormatVersion(repo.FormatVersion),
+			).WithPrivateKey(repo.PrivateKey),
 			Environment: repo.Env,
 		}
 	}

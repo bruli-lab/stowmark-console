@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruli-lab/go-core/cqs"
 	"github.com/bruli-lab/stowmark-console/internal/app"
+	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/mocks"
@@ -18,8 +19,8 @@ func failingBuses() app.Buses {
 		OpenFunc:     func(context.Context, string) (repository.Profile, error) { return repository.Profile{}, errBackend },
 	}
 	repositories := &mocks.RepositoryMock{
-		InitializedFunc: func(context.Context) (bool, error) { return false, errBackend },
-		InitializeFunc:  func(context.Context, repository.InitOptions) error { return errBackend },
+		StatusFunc:     func(context.Context) (repository.Status, error) { return repository.StatusUninitialized, errBackend },
+		InitializeFunc: func(context.Context, repository.InitOptions) error { return errBackend },
 	}
 	snapshots := &mocks.SnapshotRepositoryMock{
 		ListFunc:     func(context.Context) ([]snapshot.Snapshot, error) { return nil, errBackend },
@@ -37,7 +38,15 @@ func failingBuses() app.Buses {
 		},
 	}
 
-	return app.NewBuses(catalog, repositories, snapshots)
+	keys := &mocks.KeysMock{
+		GenerateFunc: func(context.Context, *encryption.KeyGeneration) (encryption.KeyPair, error) {
+			return encryption.KeyPair{}, errBackend
+		},
+		RewrapFunc: func(context.Context, *encryption.Rewrap) error { return errBackend },
+		RotateFunc: func(context.Context, *encryption.Rotation) error { return errBackend },
+	}
+
+	return app.NewBuses(app.Ports{Catalog: catalog, Repositories: repositories, Snapshots: snapshots, Keys: keys})
 }
 
 func TestNewBuses(t *testing.T) {
@@ -52,6 +61,9 @@ func TestNewBuses(t *testing.T) {
 		app.VerifySnapshotCommand{SnapshotID: "snap"},
 		app.RestoreSnapshotCommand{SnapshotID: "snap", Destination: "/restore"},
 		app.ExtractFileCommand{SnapshotID: "snap", Path: "/data/a.txt", Directory: "/tmp/open"},
+		app.GenerateKeysCommand{Folder: "/keys"},
+		app.RewrapKeyCommand{OldPrivateKey: "/keys/old-private.pem", NewPublicKey: "/keys/new-public.pem"},
+		app.RotateKeyCommand{PrivateKey: "/keys/private.pem", PublicKey: "/keys/public.pem"},
 	}
 	for _, command := range commands {
 		t.Run(`Given the buses

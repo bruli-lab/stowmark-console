@@ -34,7 +34,7 @@ func TestCatalog(t *testing.T) {
 	t.Run(`Given a catalog that has not opened any repository
 	When the repository status is asked
 	Then it reports that no repository is open`, func(t *testing.T) {
-		_, err := repositories.Initialized(t.Context())
+		_, err := repositories.Status(t.Context())
 
 		require.ErrorIs(t, err, store.ErrNotConnected)
 	})
@@ -58,9 +58,9 @@ func TestCatalog(t *testing.T) {
 		require.Equal(t, "first", os.Getenv(catalogVariable))
 
 		require.NoError(t, repositories.Initialize(t.Context(), profile.Init()))
-		initialized, err := repositories.Initialized(t.Context())
+		status, err := repositories.Status(t.Context())
 		require.NoError(t, err)
-		require.True(t, initialized)
+		require.Equal(t, repository.StatusReady, status)
 	})
 
 	t.Run(`Given an entry that cannot be opened
@@ -70,9 +70,9 @@ func TestCatalog(t *testing.T) {
 
 		require.Error(t, err)
 		require.Equal(t, "first", os.Getenv(catalogVariable))
-		initialized, err := repositories.Initialized(t.Context())
+		status, err := repositories.Status(t.Context())
 		require.NoError(t, err)
-		require.True(t, initialized)
+		require.Equal(t, repository.StatusReady, status)
 	})
 
 	t.Run(`Given an entry without environment variables
@@ -83,9 +83,9 @@ func TestCatalog(t *testing.T) {
 
 		_, defined := os.LookupEnv(catalogVariable)
 		require.False(t, defined)
-		initialized, err := repositories.Initialized(t.Context())
+		status, err := repositories.Status(t.Context())
 		require.NoError(t, err)
-		require.False(t, initialized)
+		require.Equal(t, repository.StatusUninitialized, status)
 	})
 
 	t.Run(`Given an unknown name

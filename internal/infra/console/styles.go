@@ -109,8 +109,7 @@ var (
 			Background(colorSurface).
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(colorPrimary).
-			Padding(1, 2).
-			Width(76)
+			Padding(1, 2)
 
 	inputStyle = lipgloss.NewStyle().
 			Foreground(colorText).

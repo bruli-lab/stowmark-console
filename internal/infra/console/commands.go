@@ -53,8 +53,8 @@ func (m *Model) openRepository(name string) tea.Cmd {
 func (m *Model) checkRepository() tea.Cmd {
 	bus := m.buses.Queries
 	return m.startOperation("Checking repository...", func(ctx context.Context) tea.Msg {
-		initialized, err := ask[bool](ctx, bus, app.RepositoryStatusQuery{})
-		return repositoryStatusMsg{initialized: initialized, err: err}
+		status, err := ask[repository.Status](ctx, bus, app.RepositoryStatusQuery{})
+		return repositoryStatusMsg{status: status, err: err}
 	})
 }
 

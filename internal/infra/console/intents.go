@@ -101,6 +101,9 @@ func (m *Model) handleIntent(msg tea.Msg) (tea.Cmd, bool) {
 	case restoreDestinationChosen:
 		m.openRestoreConfirmation(msg.request)
 	default:
+		if cmd, handled := m.handleKeyIntent(msg); handled {
+			return cmd, true
+		}
 		return m.handleOperationIntent(msg)
 	}
 
@@ -129,6 +132,12 @@ func (m *Model) handleOperationIntent(msg tea.Msg) (tea.Cmd, bool) {
 		start = func() tea.Cmd { return m.verifySnapshot(msg.snapshotID) }
 	case restoreConfirmed:
 		start = func() tea.Cmd { return m.restoreSnapshot(msg.request) }
+	case keysFolderChosen:
+		start = func() tea.Cmd { return m.generateKeys(msg.folder) }
+	case rewrapConfirmed:
+		start = func() tea.Cmd { return m.rewrapKey(msg.request) }
+	case rotationConfirmed:
+		start = func() tea.Cmd { return m.rotateKey(msg.request) }
 	default:
 		return nil, false
 	}

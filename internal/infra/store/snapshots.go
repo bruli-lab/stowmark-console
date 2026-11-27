@@ -31,7 +31,7 @@ func (s *Snapshots) List(ctx context.Context) ([]snapshot.Snapshot, error) {
 
 	summaries, err := handler.ListSnapshots(ctx)
 	if err != nil {
-		return nil, err
+		return nil, translate(err)
 	}
 
 	snapshots := make([]snapshot.Snapshot, len(summaries))
@@ -51,15 +51,10 @@ func (s *Snapshots) Manifest(ctx context.Context, snapshotID string) (snapshot.M
 
 	manifest, err := handler.GetManifest(ctx, snapshotID)
 	if err != nil {
-		return snapshot.Manifest{}, err
+		return snapshot.Manifest{}, translate(err)
 	}
 
-	files := make([]snapshot.File, len(manifest.Files))
-	for i := range manifest.Files {
-		files[i] = snapshot.NewFile(manifest.Files[i].Path, manifest.Files[i].Size)
-	}
-
-	return snapshot.NewManifest(manifest.ID, manifest.Source, files), nil
+	return snapshot.NewManifest(manifest.ID, manifest.Source, regularFiles(manifest)), nil
 }
 
 func (s *Snapshots) Create(ctx context.Context, creation *snapshot.Creation) (snapshot.Snapshot, error) {
@@ -68,22 +63,28 @@ func (s *Snapshots) Create(ctx context.Context, creation *snapshot.Creation) (sn
 		return snapshot.Snapshot{}, err
 	}
 
+	if err := s.session.writable(); err != nil {
+		return snapshot.Snapshot{}, err
+	}
+
 	result, err := handler.CreateSnapshot(ctx, creation.Source(), nil)
 	if err != nil {
-		return snapshot.Snapshot{}, err
+		return snapshot.Snapshot{}, translate(err)
 	}
 
 	manifest, err := handler.GetManifest(ctx, result.ID)
 	if err != nil {
-		return snapshot.Snapshot{}, err
+		return snapshot.Snapshot{}, translate(err)
 	}
+
+	files := regularFiles(manifest)
 
 	var totalSize int64
-	for i := range manifest.Files {
-		totalSize += manifest.Files[i].Size
+	for i := range files {
+		totalSize += files[i].Size()
 	}
 
-	return snapshot.New(result.ID, manifest.CreatedAt, len(manifest.Files), totalSize, manifest.Source), nil
+	return snapshot.New(result.ID, manifest.CreatedAt, len(files), totalSize, manifest.Source), nil
 }
 
 func (s *Snapshots) Verify(ctx context.Context, verification *snapshot.Verification) ([]snapshot.Failure, error) {
@@ -94,7 +95,7 @@ func (s *Snapshots) Verify(ctx context.Context, verification *snapshot.Verificat
 
 	result, err := handler.VerifySnapshot(ctx, verification.SnapshotID(), nil)
 	if err != nil {
-		return nil, err
+		return nil, translate(err)
 	}
 
 	return failures(result), nil
@@ -110,7 +111,7 @@ func (s *Snapshots) Restore(ctx context.Context, restoration *snapshot.Restorati
 
 	result, err := handler.RestoreSnapshot(ctx, restoration.SnapshotID(), &destination, nil)
 	if err != nil {
-		return nil, err
+		return nil, translate(err)
 	}
 
 	return failures(result), nil
@@ -158,7 +159,7 @@ func (s *Snapshots) ExtractFile(ctx context.Context, extraction *snapshot.FileEx
 
 func restoreSingleFile(ctx context.Context, handler *stowmark.Handler, snapshotID, path, directory string) (string, error) {
 	if err := handler.RestoreFile(ctx, snapshotID, path, &directory, nil); err != nil {
-		return "", err
+		return "", translate(err)
 	}
 
 	return findSingleFile(directory)
@@ -186,6 +187,19 @@ func findSingleFile(directory string) (string, error) {
 	}
 
 	return found, nil
+}
+
+func regularFiles(manifest *stowmark.Manifest) []snapshot.File {
+	files := make([]snapshot.File, 0, len(manifest.Files))
+	for i := range manifest.Files {
+		entry := &manifest.Files[i]
+		if entry.Kind != "" && entry.Kind != stowmark.RegularFile {
+			continue
+		}
+		files = append(files, snapshot.NewFile(entry.Path, entry.Size))
+	}
+
+	return files
 }
 
 func failures(result *stowmark.Result) []snapshot.Failure {

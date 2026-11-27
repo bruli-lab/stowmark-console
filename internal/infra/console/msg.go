@@ -1,6 +1,7 @@
 package console
 
 import (
+	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
@@ -17,8 +18,8 @@ type repositoryOpenedMsg struct {
 }
 
 type repositoryStatusMsg struct {
-	initialized bool
-	err         error
+	status repository.Status
+	err    error
 }
 
 type repositoryInitializedMsg struct {
@@ -64,4 +65,21 @@ type snapshotRestoredMsg struct {
 	snapshotID string
 	event      snapshot.Restored
 	err        error
+}
+
+type keysGeneratedMsg struct {
+	event encryption.KeysGenerated
+	err   error
+}
+
+type keyRewrappedMsg struct {
+	request rewrapRequest
+	event   encryption.KeyRewrapped
+	err     error
+}
+
+type keyRotatedMsg struct {
+	request rotationRequest
+	event   encryption.KeyRotated
+	err     error
 }

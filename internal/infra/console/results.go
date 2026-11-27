@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 )
 
@@ -37,11 +39,7 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 		if m.fail("open repository", msg.err) {
 			return nil
 		}
-		if !msg.initialized {
-			m.openInitConfirmation()
-			return nil
-		}
-		return m.loadSnapshots("")
+		return m.applyStatus(msg.status)
 
 	case repositoryInitializedMsg:
 		m.finishOperation()
@@ -101,6 +99,9 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 		}
 		m.message = fmt.Sprintf("Snapshot %s verified successfully", msg.snapshotID)
 
+	case keysGeneratedMsg, keyRewrappedMsg, keyRotatedMsg:
+		return m.handleKeyResult(msg)
+
 	case snapshotRestoredMsg:
 		m.finishOperation()
 		if m.fail("restore snapshot "+msg.snapshotID, msg.err) {
@@ -116,6 +117,22 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
+func (m *Model) applyStatus(status repository.Status) tea.Cmd {
+	switch status {
+	case repository.StatusUninitialized:
+		m.openInitConfirmation()
+	case repository.StatusKeyRequired:
+		m.err = explainKeyError(m.current, encryption.ErrPrivateKeyRequired)
+		if len(m.repositories) > 1 {
+			m.showRepositories()
+		}
+	default:
+		return m.loadSnapshots("")
+	}
+
+	return nil
+}
+
 func (m *Model) handleFileContent(msg *fileContentLoadedMsg) {
 	m.finishOperation()
 	if m.fail("read "+msg.request.name, msg.err) {
@@ -125,6 +142,10 @@ func (m *Model) handleFileContent(msg *fileContentLoadedMsg) {
 }
 
 func (m *Model) fail(action string, err error) bool {
+	return m.failWithKey(action, err, m.current.PrivateKey())
+}
+
+func (m *Model) failWithKey(action string, err error, privateKey *string) bool {
 	if err == nil {
 		return false
 	}
@@ -135,7 +156,7 @@ func (m *Model) fail(action string, err error) bool {
 		return true
 	}
 
-	m.err = fmt.Errorf("failed to %s: %w", action, err)
+	m.err = fmt.Errorf("failed to %s: %w", action, explainKeyError(m.current.WithPrivateKey(privateKey), err))
 	m.message = ""
 
 	return true

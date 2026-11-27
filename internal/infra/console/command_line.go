@@ -51,6 +51,12 @@ func runCommand(command string) tea.Cmd {
 		return emit(snapshotsScreenRequested{})
 	case "repo", "repos", "repositories":
 		return emit(repositoriesScreenRequested{})
+	case "keygen":
+		return emit(keygenRequested{})
+	case "rewrap":
+		return emit(rewrapRequested{})
+	case "rekey":
+		return emit(rekeyRequested{})
 	}
 
 	return emit(statusMessage{text: "Unknown command: " + command})

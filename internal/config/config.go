@@ -21,6 +21,12 @@ var (
 	ErrInvalidCompression = errors.New("invalid compression type")
 	ErrNoRepositories     = errors.New("no repositories configured")
 	ErrInvalidRepository  = errors.New("invalid repository")
+	ErrInvalidFormat      = errors.New("invalid format version")
+)
+
+const (
+	defaultFormatVersion = 2
+	latestFormatVersion  = 3
 )
 
 var compressionTypes = []string{"none", "zstd", "lz4", "xz", "gzip"}
@@ -38,6 +44,7 @@ type Repository struct {
 	PublicKey        *string           `yaml:"public_key"`
 	Compression      string            `yaml:"compression"`
 	CompressionLevel *int              `yaml:"compression_level"`
+	FormatVersion    int               `yaml:"format_version"`
 	Env              map[string]string `yaml:"env"`
 }
 
@@ -47,6 +54,7 @@ type environmentConfig struct {
 	PublicKey        *string `env:"STOWMARK_PUBLIC_KEY"`
 	Compression      string  `env:"STOWMARK_COMPRESSION"`
 	CompressionLevel *int    `env:"STOWMARK_COMPRESSION_LEVEL"`
+	FormatVersion    int     `env:"STOWMARK_FORMAT_VERSION"`
 	LogFile          string  `env:"STOWMARK_CONSOLE_LOG_FILE"`
 	RepositoriesFile string  `env:"STOWMARK_CONSOLE_CONFIG"`
 }
@@ -87,6 +95,7 @@ func FromEnvironment(environment map[string]string) (*Config, error) {
 			PublicKey:        values.PublicKey,
 			Compression:      values.Compression,
 			CompressionLevel: values.CompressionLevel,
+			FormatVersion:    values.FormatVersion,
 		})
 	}
 
@@ -151,6 +160,9 @@ func normalize(repositories []Repository) error {
 		if repo.Compression == "" {
 			repo.Compression = compressionTypes[0]
 		}
+		if repo.FormatVersion == 0 {
+			repo.FormatVersion = defaultFormatVersion
+		}
 		if !strings.Contains(repo.URL, "://") {
 			repo.URL = expandHome(repo.URL)
 		}
@@ -171,6 +183,8 @@ func validate(repo *Repository, names map[string]bool) error {
 		return fmt.Errorf("%w: %q needs a url", ErrInvalidRepository, repo.Name)
 	case repo.Compression != "" && !slices.Contains(compressionTypes, repo.Compression):
 		return fmt.Errorf("%w %q in %q, expected one of %v", ErrInvalidCompression, repo.Compression, repo.Name, compressionTypes)
+	case repo.FormatVersion < 0 || repo.FormatVersion > latestFormatVersion:
+		return fmt.Errorf("%w %d in %q, expected 1, 2 or 3", ErrInvalidFormat, repo.FormatVersion, repo.Name)
 	}
 
 	return nil

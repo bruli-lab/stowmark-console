@@ -20,6 +20,16 @@ var (
 )
 
 func pathSuggestions(value string, known []string) []string {
+	return suggestPaths(value, known, func(string, fs.DirEntry) bool { return false })
+}
+
+func keyFileSuggestions(value string) []string {
+	return suggestPaths(value, nil, func(_ string, entry fs.DirEntry) bool {
+		return entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), keyExtension)
+	})
+}
+
+func suggestPaths(value string, known []string, acceptFile func(path string, entry fs.DirEntry) bool) []string {
 	suggestions := slices.DeleteFunc(slices.Clone(known), func(origin string) bool { return origin == value })
 
 	prefix, directory := "", "."
@@ -42,8 +52,15 @@ func pathSuggestions(value string, known []string) []string {
 		if strings.HasPrefix(name, ".") && !showHidden {
 			continue
 		}
-		suggestion := prefix + name + "/"
-		if isDirectoryEntry(filepath.Join(directory, name), entry) && !slices.Contains(suggestions, suggestion) {
+		path := filepath.Join(directory, name)
+		suggestion := prefix + name
+		switch {
+		case isDirectoryEntry(path, entry):
+			suggestion += "/"
+		case !acceptFile(path, entry):
+			continue
+		}
+		if !slices.Contains(suggestions, suggestion) {
 			suggestions = append(suggestions, suggestion)
 		}
 	}
