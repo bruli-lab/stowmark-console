@@ -36,4 +36,17 @@ func TestEvents(t *testing.T) {
 		require.Equal(t, repository.InitializedEventName, initialized.EventName())
 		require.Equal(t, options, initialized.Options)
 	})
+
+	t.Run(`Given a lock report
+	When an unlocked event is built
+	Then it is named and keeps whether every lock was removed and the report`, func(t *testing.T) {
+		t.Parallel()
+		report := repository.LockReport{Removed: 2, Active: 1}
+
+		unlocked := repository.NewUnlocked(true, report)
+
+		require.Equal(t, repository.UnlockedEventName, unlocked.EventName())
+		require.True(t, unlocked.All)
+		require.Equal(t, report, unlocked.Report)
+	})
 }

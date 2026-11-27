@@ -119,8 +119,10 @@ func (m *Model) renderFooter() string {
 	switch {
 	case m.command != nil:
 		help = m.command.view()
+	case m.loading && m.transfer != nil && !m.cancelling:
+		help = m.transfer.view(m.clock()) + "   [esc] Cancel"
 	case m.loading:
-		help = m.progress + "   [esc] Cancel"
+		help = m.activity + "   [esc] Cancel"
 	case m.message != "":
 		help = m.message
 	default:

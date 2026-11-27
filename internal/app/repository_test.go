@@ -91,6 +91,53 @@ func TestInitRepository(t *testing.T) {
 	})
 }
 
+func TestUnlockRepository(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given a command that is not an unlock repository command
+	When it is handled
+	Then an invalid command error is returned`, func(t *testing.T) {
+		t.Parallel()
+
+		requireInvalidCommand(t, app.NewUnlockRepository(&mocks.RepositoryMock{}))
+	})
+
+	for _, all := range []bool{false, true} {
+		t.Run(`Given a repository with locks
+		When it is unlocked
+		Then the choice of removing every lock reaches the repository and an unlocked event reports the locks`, func(t *testing.T) {
+			t.Parallel()
+			report := repository.LockReport{Removed: 2, Active: 1}
+			repo := &mocks.RepositoryMock{
+				UnlockFunc: func(context.Context, bool) (repository.LockReport, error) { return report, nil },
+			}
+
+			events, err := app.NewUnlockRepository(repo).Handle(t.Context(), app.UnlockRepositoryCommand{All: all})
+
+			require.NoError(t, err)
+			unlocked := singleEvent[repository.Unlocked](t, events, repository.UnlockedEventName)
+			require.Equal(t, report, unlocked.Report)
+			require.Equal(t, all, unlocked.All)
+			require.Equal(t, all, repo.UnlockCalls()[0].All)
+		})
+	}
+
+	t.Run(`Given a repository that fails to unlock
+	When it is unlocked
+	Then the error is returned`, func(t *testing.T) {
+		t.Parallel()
+		repo := &mocks.RepositoryMock{
+			UnlockFunc: func(context.Context, bool) (repository.LockReport, error) {
+				return repository.LockReport{}, errBackend
+			},
+		}
+
+		_, err := app.NewUnlockRepository(repo).Handle(t.Context(), app.UnlockRepositoryCommand{})
+
+		require.ErrorIs(t, err, errBackend)
+	})
+}
+
 func TestListRepositories(t *testing.T) {
 	t.Parallel()
 

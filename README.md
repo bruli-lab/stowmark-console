@@ -219,6 +219,8 @@ Press `:` in any view, type a command and press `Enter`. While you type, the foo
 | `:keygen` | Generate a key pair for encrypted repositories |
 | `:rewrap` | Wrap the key of the open repository with a new public key |
 | `:rekey` | Encrypt every object of the open repository with a new key |
+| `:unlock` | Remove the stale locks of the open repository |
+| `:unlock!` | Remove every lock of the open repository, after a confirmation |
 
 ### Creating and restoring
 
@@ -226,13 +228,19 @@ Creating a snapshot opens a form for the origin directory, prefilled with the so
 
 Restoring asks for a destination directory first. It defaults to `~/stowmark-restore/<snapshot-id>`, never to the original source. The confirmation shows the destination and warns when it already contains files, which would be overwritten. Only `y` confirms the restore.
 
-While an operation is running, `Esc` cancels it.
+While an operation is running, `Esc` cancels it. Creating, verifying and restoring snapshots and `:rekey` show a progress bar in the footer with the stage, the files (or objects) and bytes done, the speed and the estimated remaining time.
+
+### Locks
+
+Stowmark locks the repository while it works on it: several readers can share it, but a command that changes the repository (creating a snapshot, rotating keys, pruning) needs it alone. A lock becomes stale 30 minutes after its last refresh, for example when a process crashed, and Stowmark removes stale locks by itself on the next command.
+
+When the repository is locked by another process, the error shows who holds the lock (host and process id). `:unlock` removes the stale locks and reports how many locks are still active. `:unlock!` removes every lock, also those of commands that are still running: use it only when no other Stowmark process works with the repository, because breaking a running command can corrupt the repository.
 
 ## Architecture
 
 The project follows a hexagonal architecture:
 
-- `internal/domain`: entities, aggregates, value objects, events and ports (`repository`, `snapshot`, `encryption`). Events and aggregates are built on [go-core](https://github.com/bruli-lab/go-core) `event`.
+- `internal/domain`: entities, aggregates, value objects, events and ports (`repository`, `snapshot`, `encryption`, `progress`). Events and aggregates are built on [go-core](https://github.com/bruli-lab/go-core) `event`.
 - `internal/app`: one query or command handler per use case on go-core `cqs`, subscribed to a command bus and a query bus (`app.NewBuses`). Commands return domain events.
 - `internal/infra/store`: adapter that implements the ports on top of the Stowmark library, with a single handler per session.
 - `internal/infra/console`: the terminal user interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) v2, which only talks to the application layer. A root model keeps a stack of screens (snapshots, files, preview) and the active dialog; screens emit intent messages and the root model runs the use cases.

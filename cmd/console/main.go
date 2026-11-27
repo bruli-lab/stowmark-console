@@ -57,7 +57,8 @@ func runConsole(conf *config.Config) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	session := store.NewSession()
+	feed := console.NewProgressFeed()
+	session := store.NewSession(store.WithProgress(feed))
 	defer func() { err = errors.Join(err, session.Close()) }()
 
 	catalog := store.NewCatalog(session, catalogEntries(conf.Repositories))
@@ -76,6 +77,7 @@ func runConsole(conf *config.Config) (err error) {
 	model := console.New(ctx, buses,
 		console.WithFileOpener(openDirectory, desktop.Open),
 		console.WithSplash(buildinfo.Version(version), splashDuration),
+		console.WithProgressFeed(feed),
 	)
 
 	if _, err := tea.NewProgram(&model).Run(); err != nil {

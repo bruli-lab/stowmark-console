@@ -8,6 +8,7 @@ import (
 const (
 	InitializedEventName = "repository.initialized"
 	OpenedEventName      = "repository.opened"
+	UnlockedEventName    = "repository.unlocked"
 )
 
 type Initialized struct {
@@ -31,5 +32,19 @@ func NewOpened(profile Profile) Opened {
 	return Opened{
 		BasicEvent: event.NewBasicEvent(OpenedEventName, uuid.New(), profile.Name()),
 		Profile:    profile,
+	}
+}
+
+type Unlocked struct {
+	event.BasicEvent
+	All    bool
+	Report LockReport
+}
+
+func NewUnlocked(all bool, report LockReport) Unlocked {
+	return Unlocked{
+		BasicEvent: event.NewBasicEvent(UnlockedEventName, uuid.New(), ""),
+		All:        all,
+		Report:     report,
 	}
 }

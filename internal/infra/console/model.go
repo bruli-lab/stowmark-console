@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/bruli-lab/stowmark-console/internal/app"
@@ -21,7 +22,11 @@ type Model struct {
 	dialog          dialog
 	command         *commandLine
 	loading         bool
-	progress        string
+	activity        string
+	cancelling      bool
+	transfer        *transfer
+	feed            *ProgressFeed
+	clock           func() time.Time
 	cancelOperation context.CancelFunc
 	message         string
 	err             error
@@ -47,6 +52,7 @@ func New(ctx context.Context, buses app.Buses, options ...Option) Model {
 		buses:     buses,
 		snapshots: newSnapshotsScreen(),
 		loading:   true,
+		clock:     time.Now,
 	}
 
 	for _, option := range options {
@@ -57,11 +63,19 @@ func New(ctx context.Context, buses app.Buses, options ...Option) Model {
 }
 
 func (m *Model) Init() tea.Cmd {
+	cmds := []tea.Cmd{m.loadRepositories()}
 	if m.splash != nil {
-		return tea.Batch(m.loadRepositories(), m.splash.timer())
+		cmds = append(cmds, m.splash.timer())
+	}
+	if m.feed != nil {
+		cmds = append(cmds, m.feed.next())
 	}
 
-	return m.loadRepositories()
+	if len(cmds) == 1 {
+		return cmds[0]
+	}
+
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -75,6 +89,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case splashFinishedMsg:
 		m.splash = nil
 		return m, nil
+
+	case progressReportedMsg:
+		m.applyProgress(msg.update)
+		if m.feed == nil {
+			return m, nil
+		}
+		return m, m.feed.next()
 
 	case tea.KeyPressMsg:
 		if m.splash != nil {
@@ -141,7 +162,8 @@ func (m *Model) handleInput(msg tea.Msg) tea.Cmd {
 func (m *Model) handleLoadingKey(msg tea.KeyPressMsg) {
 	if msg.String() == "esc" && m.cancelOperation != nil {
 		m.cancelOperation()
-		m.progress = "Cancelling..."
+		m.activity = "Cancelling..."
+		m.cancelling = true
 	}
 }
 

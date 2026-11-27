@@ -23,6 +23,7 @@ func NewBuses(ports Ports) Buses {
 	commands := cqs.NewCommandBus()
 	commands.Subscribe(OpenRepositoryCommandName, NewOpenRepository(ports.Catalog))
 	commands.Subscribe(InitRepositoryCommandName, NewInitRepository(ports.Repositories))
+	commands.Subscribe(UnlockRepositoryCommandName, NewUnlockRepository(ports.Repositories))
 	commands.Subscribe(CreateSnapshotCommandName, NewCreateSnapshot(ports.Snapshots))
 	commands.Subscribe(VerifySnapshotCommandName, NewVerifySnapshot(ports.Snapshots))
 	commands.Subscribe(RestoreSnapshotCommandName, NewRestoreSnapshot(ports.Snapshots))

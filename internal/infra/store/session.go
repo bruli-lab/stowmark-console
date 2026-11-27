@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
+	"github.com/bruli-lab/stowmark-console/internal/domain/progress"
 	"github.com/bruli-lab/stowmark/pkg/stowmark"
 )
 
@@ -13,14 +14,28 @@ var ErrNotConnected = errors.New("no repository is open")
 type Session struct {
 	handler           *stowmark.Handler
 	missingPrivateKey bool
+	progress          *progressReporter
 }
 
-func NewSession() *Session {
-	return &Session{}
+type SessionOption func(*Session)
+
+func WithProgress(listener progress.Listener) SessionOption {
+	return func(s *Session) {
+		s.progress = newProgressReporter(listener)
+	}
 }
 
-func Open(ctx context.Context, repositoryURL string, privateKey *string) (*Session, error) {
-	session := NewSession()
+func NewSession(options ...SessionOption) *Session {
+	session := &Session{}
+	for _, option := range options {
+		option(session)
+	}
+
+	return session
+}
+
+func Open(ctx context.Context, repositoryURL string, privateKey *string, options ...SessionOption) (*Session, error) {
+	session := NewSession(options...)
 	if err := session.Connect(ctx, repositoryURL, privateKey); err != nil {
 		return nil, err
 	}
@@ -32,6 +47,9 @@ func (s *Session) Connect(ctx context.Context, repositoryURL string, privateKey 
 	var options []stowmark.Option
 	if privateKey != nil {
 		options = append(options, stowmark.WithPrivateKey(*privateKey))
+	}
+	if s.progress != nil {
+		options = append(options, stowmark.WithProgress(s.progress))
 	}
 
 	handler, err := stowmark.NewHandler(ctx, repositoryURL, options...)

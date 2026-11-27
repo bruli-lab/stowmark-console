@@ -6,8 +6,24 @@ import (
 	"strings"
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
+	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark/pkg/stowmark"
 )
+
+const lockedMessage = "repository is locked"
+
+type domainError struct {
+	domain error
+	cause  error
+}
+
+func (e domainError) Error() string {
+	return e.cause.Error()
+}
+
+func (e domainError) Unwrap() []error {
+	return []error{e.domain, e.cause}
+}
 
 var encryptionMessages = []struct {
 	message string
@@ -31,6 +47,10 @@ func translate(err error) error {
 
 	if errors.Is(err, stowmark.ErrPrivateKeyRequired) {
 		return fmt.Errorf("%w: %w", encryption.ErrPrivateKeyRequired, err)
+	}
+
+	if strings.Contains(err.Error(), lockedMessage) {
+		return domainError{domain: repository.ErrLocked, cause: err}
 	}
 
 	for _, known := range encryptionMessages {
