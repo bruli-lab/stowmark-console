@@ -719,6 +719,62 @@ func TestConsoleDialogsAndCommands(t *testing.T) {
 		require.Equal(t, "Unknown command: nope", h.model.message)
 	})
 
+	t.Run(`Given an unencrypted repository
+	When the console starts
+	Then the sidebar lists the general commands but not the key rotation ones`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+
+		view := h.view()
+
+		require.Contains(t, view, "Commands")
+		require.Contains(t, view, ":repo")
+		require.Contains(t, view, ":keygen")
+		require.NotContains(t, view, ":rewrap")
+		require.NotContains(t, view, ":rekey")
+	})
+
+	t.Run(`Given the command line
+	When the user types the beginning of a command
+	Then the footer shows the matching commands`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes(":"))
+
+		h.typeText("re")
+
+		footer := h.model.renderFooter()
+		require.Contains(t, footer, ":repo")
+		require.Contains(t, footer, ":rewrap")
+		require.Contains(t, footer, ":rekey")
+		require.NotContains(t, footer, ":keygen")
+	})
+
+	t.Run(`Given the command line with the beginning of a command
+	When the user presses tab
+	Then the command is completed`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes(":"))
+		h.typeText("keyg")
+
+		h.pressAndRun(key(tea.KeyTab))
+
+		require.Equal(t, "keygen", h.model.command.input.Value())
+	})
+
+	t.Run(`Given the command line
+	When the user types something no command starts with
+	Then the footer says that no command matches`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true).started()
+		h.pressAndRun(runes(":"))
+
+		h.typeText("zz")
+
+		require.Contains(t, h.model.renderFooter(), "no matching command")
+	})
+
 	t.Run(`Given an empty command line
 	When the user presses backspace
 	Then the command line is closed`, func(t *testing.T) {

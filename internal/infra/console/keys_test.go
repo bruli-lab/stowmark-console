@@ -86,6 +86,20 @@ func TestConsoleEncryptedRepository(t *testing.T) {
 		require.Contains(t, view, "SHA256:zrDYzwuHzX")
 	})
 
+	t.Run(`Given an encrypted repository
+	When the console starts
+	Then the sidebar lists the key rotation commands`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, true)
+		h.encrypted(t, 3, true)
+
+		h.started()
+
+		view := h.view()
+		require.Contains(t, view, ":rewrap")
+		require.Contains(t, view, ":rekey")
+	})
+
 	t.Run(`Given an encrypted repository configured without its private key
 	When the console starts
 	Then the sidebar says that the private key is not set`, func(t *testing.T) {

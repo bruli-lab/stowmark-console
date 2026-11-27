@@ -129,7 +129,7 @@ func (m *Model) renderFooter() string {
 	case m.message != "":
 		help = m.message
 	default:
-		help = m.top().help() + "   [:q] Exit"
+		help = m.top().help() + "   [:] Commands   [:q] Exit"
 	}
 
 	return footerStyle.Width(m.width).Render(truncate(help, max(1, m.width-footerStyle.GetHorizontalFrameSize())))
@@ -138,11 +138,6 @@ func (m *Model) renderFooter() string {
 func (m *Model) renderSidebar(availableHeight, width int) string {
 	var builder strings.Builder
 
-	if availableHeight >= minLogoHeight {
-		builder.WriteString(logoStyle.Render(stowmarkLogo()))
-		builder.WriteString("\n\n")
-	}
-
 	builder.WriteString(headerStyle.Render("Navigation"))
 	builder.WriteString("\n\n")
 
@@ -150,6 +145,8 @@ func (m *Model) renderSidebar(availableHeight, width int) string {
 	for _, item := range menuScreens {
 		builder.WriteString(renderMenuItem(item, item == current))
 	}
+
+	writeCommands(&builder, m.connected() && m.current.Encrypted(), width)
 
 	if m.connected() && m.current.Encrypted() {
 		writeEncryption(&builder, m.current, width)
@@ -165,7 +162,16 @@ func (m *Model) renderSidebar(availableHeight, width int) string {
 		writeDetail(&builder, "Source", selected.Source(), width)
 	}
 
-	return builder.String()
+	return withLogo(builder.String(), availableHeight-sidebarStyle.GetVerticalFrameSize())
+}
+
+func withLogo(content string, height int) string {
+	logo := logoStyle.Render(stowmarkLogo())
+	if height < minLogoHeight || lipgloss.Height(logo)+1+lipgloss.Height(content) > height {
+		return content
+	}
+
+	return logo + "\n\n" + content
 }
 
 func writeEncryption(builder *strings.Builder, profile repository.Profile, width int) {
@@ -181,6 +187,17 @@ func writeEncryption(builder *strings.Builder, profile repository.Profile, width
 
 	if fingerprint := profile.Fingerprint(); fingerprint != "" {
 		writeDetail(builder, "Fingerprint", fingerprint, width)
+	}
+}
+
+func writeCommands(builder *strings.Builder, encrypted bool, width int) {
+	builder.WriteString("\n")
+	builder.WriteString(headerStyle.Render("Commands"))
+	builder.WriteString("\n\n")
+
+	for _, command := range listedCommands(encrypted) {
+		name := fmt.Sprintf("  :%-7s ", command.name())
+		builder.WriteString(name + mutedStyle.Render(truncate(command.summary, max(1, width-len(name)))) + "\n")
 	}
 }
 
