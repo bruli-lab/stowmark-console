@@ -7,7 +7,10 @@ import (
 	"testing"
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
+	"github.com/bruli-lab/stowmark-console/internal/domain/integrity"
+	"github.com/bruli-lab/stowmark-console/internal/domain/progress"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
+	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/bruli-lab/stowmark-console/internal/infra/store"
 	"github.com/stretchr/testify/require"
@@ -77,12 +80,15 @@ func exerciseRepository(t *testing.T, repositoryURL string, setup repositorySetu
 	t.Helper()
 	source := writeSource(t)
 
-	session, err := store.Open(t.Context(), repositoryURL, setup.privateKey)
+	recorder := &progressRecorder{}
+	session, err := store.Open(t.Context(), repositoryURL, setup.privateKey, store.WithProgress(recorder))
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, session.Close()) })
 
 	repositories := store.NewRepositories(session)
 	snapshots := store.NewSnapshots(session)
+	checker := store.NewChecker(session)
+	retentionRepository := store.NewRetention(session)
 
 	var snapshotID string
 
@@ -201,6 +207,96 @@ func exerciseRepository(t *testing.T, repositoryURL string, setup repositorySetu
 		original, err := os.ReadFile(filepath.Join(source, "README.txt"))
 		require.NoError(t, err)
 		require.Equal(t, "hello stowmark", string(original))
+	})
+
+	t.Run(`Given a repository without other processes
+	When the stale locks are removed
+	Then no lock is left`, func(t *testing.T) {
+		report, err := repositories.Unlock(t.Context(), false)
+
+		require.NoError(t, err)
+		require.Zero(t, report.Active)
+	})
+
+	var excludedID string
+
+	t.Run(`Given a source
+	When a snapshot is created excluding the markdown files
+	Then the manifest has only the other files and the backup is reported`, func(t *testing.T) {
+		recorder.take()
+		created, err := snapshot.NewCreation(source, snapshot.NewExclusions([]string{"*.md"}, false))
+		require.NoError(t, err)
+
+		result, skipped, err := snapshots.Create(t.Context(), created)
+
+		require.NoError(t, err)
+		require.Empty(t, skipped)
+		require.Equal(t, 1, result.FileCount())
+		excludedID = result.ID()
+		manifest, err := snapshots.Manifest(t.Context(), excludedID)
+		require.NoError(t, err)
+		require.Equal(t, []string{filepath.Join(source, "README.txt")}, filePaths(manifest))
+		updates := recorder.take()
+		require.NotEmpty(t, updates)
+		last := updates[len(updates)-1]
+		require.Equal(t, progress.StageBackingUp, last.Stage)
+		require.True(t, last.Finished)
+		require.Equal(t, int64(len("hello stowmark")), last.TotalBytes)
+	})
+
+	t.Run(`Given three snapshots of a source
+	When they are forgotten keeping the last one
+	Then only the snapshot with the exclusions is left`, func(t *testing.T) {
+		forgetting, err := retention.NewForgetting(retention.Rules{Last: 1})
+		require.NoError(t, err)
+
+		result, err := retentionRepository.Forget(t.Context(), forgetting)
+
+		require.NoError(t, err)
+		require.Len(t, result.Forgotten, 2)
+		listed, err := snapshots.List(t.Context())
+		require.NoError(t, err)
+		require.Len(t, listed, 1)
+		require.Equal(t, excludedID, listed[0].ID())
+	})
+
+	t.Run(`Given forgotten snapshots with a file no other snapshot has
+	When the repository is pruned
+	Then the objects of that file are removed`, func(t *testing.T) {
+		plan, err := retentionRepository.PlanPrune(t.Context())
+		require.NoError(t, err)
+		require.Positive(t, plan.UnreferencedObjects)
+
+		result, err := retentionRepository.Prune(t.Context(), retention.NewPruning())
+
+		require.NoError(t, err)
+		require.Equal(t, plan.UnreferencedObjects, result.RemovedObjects)
+		require.Zero(t, result.MissingObjects)
+	})
+
+	t.Run(`Given a pruned repository
+	When its structure is checked
+	Then it has no errors nor unreferenced objects`, func(t *testing.T) {
+		report, err := checker.Check(t.Context(), integrity.StructureOnly())
+
+		require.NoError(t, err)
+		require.Equal(t, 1, report.Snapshots)
+		require.Zero(t, report.UnreferencedObjects)
+		require.False(t, report.HasErrors())
+	})
+
+	t.Run(`Given a pruned repository
+	When all its data is checked
+	Then every object is read without errors and the reading is reported`, func(t *testing.T) {
+		recorder.take()
+
+		report, err := checker.Check(t.Context(), integrity.AllData())
+
+		require.NoError(t, err)
+		require.Positive(t, report.ReadObjects)
+		require.Empty(t, report.CorruptObjects)
+		require.False(t, report.HasErrors())
+		requireStage(t, recorder.take(), progress.StageReadingData, report.ReadObjects, -1)
 	})
 }
 
