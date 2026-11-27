@@ -25,6 +25,9 @@ var _ repository.Catalog = &CatalogMock{}
 //			ProfilesFunc: func() []repository.Profile {
 //				panic("mock out the Profiles method")
 //			},
+//			UpdateFunc: func(ctx context.Context, profile repository.Profile) (repository.Profile, error) {
+//				panic("mock out the Update method")
+//			},
 //		}
 //
 //		// use mockedCatalog in code that requires repository.Catalog
@@ -38,6 +41,9 @@ type CatalogMock struct {
 	// ProfilesFunc mocks the Profiles method.
 	ProfilesFunc func() []repository.Profile
 
+	// UpdateFunc mocks the Update method.
+	UpdateFunc func(ctx context.Context, profile repository.Profile) (repository.Profile, error)
+
 	// calls tracks calls to the methods.
 	calls struct {
 		// Open holds details about calls to the Open method.
@@ -50,9 +56,17 @@ type CatalogMock struct {
 		// Profiles holds details about calls to the Profiles method.
 		Profiles []struct {
 		}
+		// Update holds details about calls to the Update method.
+		Update []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Profile is the profile argument value.
+			Profile repository.Profile
+		}
 	}
 	lockOpen     sync.RWMutex
 	lockProfiles sync.RWMutex
+	lockUpdate   sync.RWMutex
 }
 
 // Open calls OpenFunc.
@@ -115,5 +129,41 @@ func (mock *CatalogMock) ProfilesCalls() []struct {
 	mock.lockProfiles.RLock()
 	calls = mock.calls.Profiles
 	mock.lockProfiles.RUnlock()
+	return calls
+}
+
+// Update calls UpdateFunc.
+func (mock *CatalogMock) Update(ctx context.Context, profile repository.Profile) (repository.Profile, error) {
+	if mock.UpdateFunc == nil {
+		panic("CatalogMock.UpdateFunc: method is nil but Catalog.Update was just called")
+	}
+	callInfo := struct {
+		Ctx     context.Context
+		Profile repository.Profile
+	}{
+		Ctx:     ctx,
+		Profile: profile,
+	}
+	mock.lockUpdate.Lock()
+	mock.calls.Update = append(mock.calls.Update, callInfo)
+	mock.lockUpdate.Unlock()
+	return mock.UpdateFunc(ctx, profile)
+}
+
+// UpdateCalls gets all the calls that were made to Update.
+// Check the length with:
+//
+//	len(mockedCatalog.UpdateCalls())
+func (mock *CatalogMock) UpdateCalls() []struct {
+	Ctx     context.Context
+	Profile repository.Profile
+} {
+	var calls []struct {
+		Ctx     context.Context
+		Profile repository.Profile
+	}
+	mock.lockUpdate.RLock()
+	calls = mock.calls.Update
+	mock.lockUpdate.RUnlock()
 	return calls
 }

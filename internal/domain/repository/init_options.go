@@ -30,6 +30,11 @@ func (o InitOptions) WithFormatVersion(version int) InitOptions {
 	return o
 }
 
+func (o InitOptions) WithPublicKey(path string) InitOptions {
+	o.publicKey = &path
+	return o
+}
+
 func (o InitOptions) Compression() string {
 	if o.compression == "" {
 		return NoCompression
