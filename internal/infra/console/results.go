@@ -86,6 +86,10 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 			created.FileCount(),
 			formatSize(created.TotalSize()),
 		)
+		if len(msg.event.Skipped) > 0 {
+			m.message += "; " + skippedSummary(msg.event.Skipped)
+			m.dialog = skippedDialog(&msg.event)
+		}
 		return m.loadSnapshots(created.ID())
 
 	case snapshotVerifiedMsg:

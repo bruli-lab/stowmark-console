@@ -49,6 +49,8 @@ type Repository struct {
 	CompressionLevel *int              `yaml:"compression_level"`
 	FormatVersion    int               `yaml:"format_version"`
 	Retention        *Retention        `yaml:"retention"`
+	Exclude          []string          `yaml:"exclude"`
+	SkipIgnoreFiles  bool              `yaml:"skip_ignore_files"`
 	Env              map[string]string `yaml:"env"`
 }
 

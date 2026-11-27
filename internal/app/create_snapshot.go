@@ -11,7 +11,8 @@ import (
 const CreateSnapshotCommandName = "create-snapshot"
 
 type CreateSnapshotCommand struct {
-	Source string
+	Source     string
+	Exclusions snapshot.Exclusions
 }
 
 func (CreateSnapshotCommand) Name() string {
@@ -32,17 +33,17 @@ func (h CreateSnapshot) Handle(ctx context.Context, command cqs.Command) ([]even
 		return nil, cqs.NewInvalidCommandError(CreateSnapshotCommandName, command.Name())
 	}
 
-	creation, err := snapshot.NewCreation(cmd.Source)
+	creation, err := snapshot.NewCreation(cmd.Source, cmd.Exclusions)
 	if err != nil {
 		return nil, err
 	}
 
-	created, err := h.snapshots.Create(ctx, creation)
+	created, skipped, err := h.snapshots.Create(ctx, creation)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := creation.Created(created); err != nil {
+	if err := creation.Created(created, skipped); err != nil {
 		return nil, err
 	}
 

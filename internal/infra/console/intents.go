@@ -39,7 +39,8 @@ type snapshotsScreenRequested struct{}
 type snapshotCreateRequested struct{}
 
 type snapshotSourceChosen struct {
-	source string
+	source     string
+	exclusions snapshot.Exclusions
 }
 
 type snapshotVerifyRequested struct {
@@ -96,6 +97,8 @@ func (m *Model) handleIntent(msg tea.Msg) (tea.Cmd, bool) {
 		m.message = msg.text
 	case snapshotCreateRequested:
 		m.openCreateDialog()
+	case snapshotOriginChosen:
+		m.dialog = newCreateOptionsDialog(msg.source, m.current.Exclusions())
 	case snapshotRestoreRequested:
 		m.openRestoreDialog(msg.snapshotID)
 	case restoreDestinationChosen:
@@ -136,7 +139,7 @@ func (m *Model) handleOperationIntent(msg tea.Msg) (tea.Cmd, bool) {
 	case fileOpenRequested:
 		start = func() tea.Cmd { return m.openFile(msg.request) }
 	case snapshotSourceChosen:
-		start = func() tea.Cmd { return m.createSnapshot(msg.source) }
+		start = func() tea.Cmd { return m.createSnapshot(msg.source, msg.exclusions) }
 	case snapshotVerifyRequested:
 		start = func() tea.Cmd { return m.verifySnapshot(msg.snapshotID) }
 	case restoreConfirmed:

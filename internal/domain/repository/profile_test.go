@@ -6,6 +6,7 @@ import (
 
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
+	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
 	"github.com/stretchr/testify/require"
 )
 
@@ -119,6 +120,23 @@ func TestProfileRetention(t *testing.T) {
 		configured, ok := profile.Retention()
 		require.True(t, ok)
 		require.Equal(t, rules, configured)
+	})
+
+	t.Run(`Given a profile with retention rules and exclusions
+	When both are asked
+	Then each keeps its value`, func(t *testing.T) {
+		t.Parallel()
+		rules := retention.Rules{Last: 3}
+		exclusions := snapshot.NewExclusions([]string{"*.tmp"}, true)
+		base := repository.NewProfile("nas", "/backups", repository.NewInitOptions("", nil, nil))
+
+		profile := base.WithExclusions(exclusions).WithRetention(&rules)
+
+		configured, ok := profile.Retention()
+		require.True(t, ok)
+		require.Equal(t, rules, configured)
+		require.Equal(t, exclusions, profile.Exclusions())
+		require.True(t, base.Exclusions().Empty())
 	})
 
 	t.Run(`Given a profile without retention rules

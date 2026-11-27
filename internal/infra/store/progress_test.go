@@ -47,7 +47,7 @@ func TestStoreProgress(t *testing.T) {
 	t.Run(`Given a session with a progress listener
 	When a snapshot is created
 	Then the listener follows the backup from its totals to the finish`, func(t *testing.T) {
-		created, err := snapshots.Create(t.Context(), creation(t, source))
+		created, _, err := snapshots.Create(t.Context(), creation(t, source))
 		require.NoError(t, err)
 		snapshotID = created.ID()
 

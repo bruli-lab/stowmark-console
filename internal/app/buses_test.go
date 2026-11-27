@@ -31,8 +31,8 @@ func failingBuses() app.Buses {
 		FileContentFunc: func(context.Context, string, string, int64) ([]byte, error) {
 			return nil, errBackend
 		},
-		CreateFunc: func(context.Context, *snapshot.Creation) (snapshot.Snapshot, error) {
-			return snapshot.Snapshot{}, errBackend
+		CreateFunc: func(context.Context, *snapshot.Creation) (snapshot.Snapshot, []snapshot.SkippedFile, error) {
+			return snapshot.Snapshot{}, nil, errBackend
 		},
 		VerifyFunc:  func(context.Context, *snapshot.Verification) ([]snapshot.Failure, error) { return nil, errBackend },
 		RestoreFunc: func(context.Context, *snapshot.Restoration) ([]snapshot.Failure, error) { return nil, errBackend },

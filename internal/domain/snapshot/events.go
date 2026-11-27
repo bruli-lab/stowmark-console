@@ -15,12 +15,14 @@ const (
 type Created struct {
 	event.BasicEvent
 	Snapshot Snapshot
+	Skipped  []SkippedFile
 }
 
-func NewCreated(created Snapshot) Created {
+func NewCreated(created Snapshot, skipped []SkippedFile) Created {
 	return Created{
 		BasicEvent: event.NewBasicEvent(CreatedEventName, uuid.New(), created.ID()),
 		Snapshot:   created,
+		Skipped:    skipped,
 	}
 }
 

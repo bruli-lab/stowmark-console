@@ -269,7 +269,7 @@ func (m *Model) openCreateDialog() {
 		"Create snapshot",
 		"Origin directory",
 		origin,
-		"[Tab] Complete  [↑↓] Suggestions  [Enter] Create  [Esc] Cancel",
+		"[Tab] Complete  [↑↓] Suggestions  [Enter] Continue  [Esc] Cancel",
 		func(value string) (tea.Msg, error) {
 			if value == "" {
 				return nil, errOriginRequired
@@ -281,7 +281,7 @@ func (m *Model) openCreateDialog() {
 			if err != nil {
 				return nil, err
 			}
-			return snapshotSourceChosen{source: source}, nil
+			return snapshotOriginChosen{source: source}, nil
 		},
 		emit(statusMessage{text: "Snapshot creation cancelled"}),
 	).withCompletion(
