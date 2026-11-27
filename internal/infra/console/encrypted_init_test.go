@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -12,63 +13,180 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func (h *harness) initForm() *initForm {
+	form, _ := h.model.dialog.(*initForm)
+	return form
+}
+
+func (h *harness) focusInit(t *testing.T, field initField) {
+	t.Helper()
+	for range 6 {
+		if h.initForm().focus == field {
+			return
+		}
+		h.pressAndRun(key(tea.KeyTab))
+	}
+	require.Equal(t, field, h.initForm().focus)
+}
+
+func (h *harness) chooseInit(t *testing.T, field initField, value string) {
+	t.Helper()
+	h.focusInit(t, field)
+	for range 6 {
+		if containsValue(h.initForm(), field, value) {
+			return
+		}
+		h.pressAndRun(key(tea.KeyRight))
+	}
+	require.True(t, containsValue(h.initForm(), field, value), "%s not reached", value)
+}
+
+func containsValue(form *initForm, field initField, value string) bool {
+	switch field {
+	case initCompression:
+		return form.compressionName() == value
+	case initEncryption:
+		return form.encryptionName() == value
+	case initFormat:
+		return strconv.Itoa(form.format) == value
+	case initLevel, initKeysFolder:
+	}
+	return false
+}
+
 func (h *harness) initEncrypted(t *testing.T, folder string) {
 	t.Helper()
-	h.pressAndRun(runes("e"))
-	require.NotNil(t, h.prompt())
+	h.chooseInit(t, initEncryption, encryptionNewKeys)
+	h.focusInit(t, initKeysFolder)
 	h.clearInput()
 	h.typeText(folder)
 	h.pressAndRun(key(tea.KeyEnter))
 }
 
-func TestConsoleEncryptedInit(t *testing.T) {
+func TestConsoleInitForm(t *testing.T) {
 	t.Parallel()
 
-	t.Run(`Given a repository to initialize that has no public key
-	When the user chooses to initialize it encrypted
-	Then it asks for the folder of the new key pair, prefilled with the default one`, func(t *testing.T) {
+	t.Run(`Given the init form of a zstd repository
+	When the user changes the compression to gzip with level 9
+	Then the repository is initialized with them`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
+		h.chooseInit(t, initCompression, "gzip")
+		h.focusInit(t, initLevel)
+		h.typeText("9")
 
-		h.pressAndRun(runes("e"))
+		h.pressAndRun(key(tea.KeyEnter))
 
-		require.NotNil(t, h.prompt())
-		require.Equal(t, defaultKeysFolder(), h.prompt().input.Value())
-		require.Empty(t, h.keys.GenerateCalls())
+		options := h.repositories.InitializeCalls()[0].Options
+		require.Equal(t, "gzip", options.Compression())
+		require.Equal(t, 9, *options.CompressionLevel())
+		require.Equal(t, "gzip", h.model.current.Init().Compression())
 	})
 
-	t.Run(`Given the folder prompt of the encrypted init
-	When the user goes back
-	Then the initialization choice is shown again`, func(t *testing.T) {
+	t.Run(`Given the init form
+	When the compression is xz or none
+	Then there is no level field`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
-		h.pressAndRun(runes("e"))
 
-		h.pressAndRun(key(tea.KeyEsc))
+		h.chooseInit(t, initCompression, "xz")
 
-		require.NotNil(t, h.choice())
+		require.NotContains(t, h.initForm().visible(), initLevel)
+		require.NotContains(t, h.view(), "empty for")
+	})
+
+	t.Run(`Given the init form with a level out of the range of the compression
+	When the user submits it
+	Then the form stays open with the error`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, false).started()
+		h.focusInit(t, initLevel)
+		h.typeText("30")
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.NotNil(t, h.initForm())
+		require.ErrorIs(t, h.initForm().err, repository.ErrInvalidCompressionLevel)
 		require.Empty(t, h.repositories.InitializeCalls())
 	})
 
-	t.Run(`Given the folder prompt of the encrypted init
-	When the user chooses a folder
-	Then a key pair is generated there, the repository is initialized with format version 3 and the session uses the keys`, func(t *testing.T) {
+	t.Run(`Given the init form with a level that is not a number
+	When the user submits it
+	Then the form stays open with the error`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, false).started()
+		h.focusInit(t, initLevel)
+		h.typeText("fast")
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.ErrorIs(t, h.initForm().err, repository.ErrInvalidCompressionLevel)
+		require.Contains(t, h.view(), "it must be a whole number")
+		require.Empty(t, h.repositories.InitializeCalls())
+	})
+
+	t.Run(`Given the init form with a new key pair
+	When the user lowers the format version
+	Then it recommends format version 3`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, false).started()
+		h.chooseInit(t, initEncryption, encryptionNewKeys)
+
+		h.chooseInit(t, initFormat, "2")
+
+		require.Contains(t, h.view(), "Format version 3 is recommended")
+	})
+
+	t.Run(`Given the init form
+	When the user changes the format version
+	Then the repository is initialized with it`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, false).started()
+
+		h.chooseInit(t, initFormat, "3")
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Equal(t, 3, h.repositories.InitializeCalls()[0].Options.FormatVersion())
+	})
+}
+
+func TestConsoleEncryptedInit(t *testing.T) {
+	t.Parallel()
+
+	t.Run(`Given the init form of a repository without public key
+	When the user chooses a new key pair
+	Then the format becomes version 3 and it asks for the keys folder, prefilled with the default one`, func(t *testing.T) {
+		t.Parallel()
+		h := newHarness(t, false).started()
+
+		h.chooseInit(t, initEncryption, encryptionNewKeys)
+
+		require.Equal(t, repository.LatestFormatVersion, h.initForm().format)
+		require.Contains(t, h.initForm().visible(), initKeysFolder)
+		require.Equal(t, defaultKeysFolder(), h.initForm().keysFolder.Value())
+		require.Empty(t, h.keys.GenerateCalls())
+	})
+
+	t.Run(`Given the init form with a new key pair
+	When the user submits it with a folder
+	Then a key pair is generated there, the repository is initialized with the chosen options and the session uses the keys`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
 		folder := filepath.Join(t.TempDir(), "keys")
+		h.chooseInit(t, initCompression, "lz4")
 
 		h.initEncrypted(t, folder)
 
 		require.Equal(t, folder, h.keys.GenerateCalls()[0].Generation.Folder())
 		options := h.repositories.InitializeCalls()[0].Options
 		require.Equal(t, repository.LatestFormatVersion, options.FormatVersion())
-		require.Equal(t, "zstd", options.Compression())
+		require.Equal(t, "lz4", options.Compression())
 		require.Equal(t, filepath.Join(folder, "1234-public.pem"), *options.PublicKey())
 		require.True(t, h.model.current.Encrypted())
 		require.Equal(t, filepath.Join(folder, "1234-private.pem"), *h.model.current.PrivateKey())
 		require.Equal(t, fingerprint, h.model.current.Fingerprint())
 		require.Len(t, h.snapshots.ListCalls(), 1)
-		require.Contains(t, h.model.message, "initialized encrypted")
+		require.Contains(t, h.model.message, "initialized encrypted (format version 3)")
 	})
 
 	t.Run(`Given the default repository initialized encrypted
@@ -81,7 +199,7 @@ func TestConsoleEncryptedInit(t *testing.T) {
 
 		view := h.model.dialog.view()
 		require.Contains(t, view, "STOWMARK_PRIVATE_KEY=")
-		require.Contains(t, view, "STOWMARK_FORMAT_VERSION=3")
+		require.Contains(t, view, "STOWMARK_PUBLIC_KEY=")
 		require.Contains(t, view, "Keep the private key safe")
 	})
 
@@ -98,7 +216,6 @@ func TestConsoleEncryptedInit(t *testing.T) {
 		view := h.model.dialog.view()
 		require.Contains(t, view, "private_key: ")
 		require.Contains(t, view, "public_key: ")
-		require.Contains(t, view, "format_version: 3")
 	})
 
 	t.Run(`Given a key pair that cannot be generated
@@ -119,13 +236,20 @@ func TestConsoleEncryptedInit(t *testing.T) {
 
 	t.Run(`Given a repository whose configuration has a public key
 	When it has to be initialized
-	Then the confirmation has no encrypted choice`, func(t *testing.T) {
+	Then the encryption is the configured key and cannot be changed`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false)
-		h.encrypted(t, 3, true)
+		keys := h.encrypted(t, 3, true)
 		h.started()
 
-		require.NotNil(t, h.confirmation())
-		require.NotContains(t, h.view(), "Initialize encrypted")
+		h.focusInit(t, initEncryption)
+		h.pressAndRun(key(tea.KeyRight))
+		require.Equal(t, encryptionConfigured, h.initForm().encryptionName())
+		require.NotContains(t, h.view(), "◂")
+
+		h.pressAndRun(key(tea.KeyEnter))
+
+		require.Empty(t, h.keys.GenerateCalls())
+		require.Equal(t, keys.publicKey, *h.repositories.InitializeCalls()[0].Options.PublicKey())
 	})
 }

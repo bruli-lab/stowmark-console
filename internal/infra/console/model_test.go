@@ -239,47 +239,35 @@ func TestConsoleStartup(t *testing.T) {
 
 	t.Run(`Given a repository that is not initialized
 	When the console starts
-	Then it asks for confirmation showing the init options`, func(t *testing.T) {
+	Then it shows the init form prefilled with the configured options`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
 
-		require.NotNil(t, h.choice())
+		require.NotNil(t, h.initForm())
 		require.Contains(t, h.view(), "zstd")
-		require.Contains(t, h.view(), "[e] Initialize encrypted")
+		require.Contains(t, h.view(), "Encryption")
 		require.Empty(t, h.repositories.InitializeCalls())
 	})
 
-	t.Run(`Given the initialization confirmation
-	When the user rejects it
+	t.Run(`Given the init form
+	When the user cancels it
 	Then the console quits without initializing`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
 
-		_, cmd := h.model.Update(h.press(runes("n"))())
+		_, cmd := h.model.Update(h.press(key(tea.KeyEsc))())
 
 		require.True(t, isQuit(cmd))
 		require.Empty(t, h.repositories.InitializeCalls())
 	})
 
-	t.Run(`Given the initialization confirmation
-	When the user presses enter
-	Then nothing is initialized`, func(t *testing.T) {
-		t.Parallel()
-		h := newHarness(t, false).started()
-
-		h.pressAndRun(key(tea.KeyEnter))
-
-		require.NotNil(t, h.choice())
-		require.Empty(t, h.repositories.InitializeCalls())
-	})
-
-	t.Run(`Given the initialization confirmation
-	When the user accepts it
+	t.Run(`Given the init form
+	When the user submits it unchanged
 	Then the repository is initialized with the configured options and the snapshots are listed`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false).started()
 
-		h.pressAndRun(runes("y"))
+		h.pressAndRun(key(tea.KeyEnter))
 
 		require.Len(t, h.repositories.InitializeCalls(), 1)
 		require.Equal(t, "zstd", h.repositories.InitializeCalls()[0].Options.Compression())
@@ -1171,7 +1159,7 @@ func TestConsoleRepositories(t *testing.T) {
 		h := newHarness(t, false).withRepository("nas", nasLocation).started()
 		h.pressAndRun(key(tea.KeyEnter))
 
-		cmd := h.press(runes("n"))
+		cmd := h.press(key(tea.KeyEsc))
 		require.False(t, isQuit(cmd))
 		h.run(cmd)
 

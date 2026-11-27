@@ -178,7 +178,7 @@ func TestConsoleEncryptedRepository(t *testing.T) {
 
 	t.Run(`Given an encrypted repository with format version 2 that is not initialized
 	When the console starts
-	Then the confirmation shows the format and recommends version 3`, func(t *testing.T) {
+	Then the init form shows the format and recommends version 3`, func(t *testing.T) {
 		t.Parallel()
 		h := newHarness(t, false)
 		h.encrypted(t, 2, true)
@@ -199,7 +199,7 @@ func TestConsoleEncryptedRepository(t *testing.T) {
 		h.started()
 		require.NotContains(t, h.view(), "is recommended")
 
-		h.pressAndRun(runes("y"))
+		h.pressAndRun(key(tea.KeyEnter))
 
 		require.Equal(t, 3, h.repositories.InitializeCalls()[0].Options.FormatVersion())
 	})

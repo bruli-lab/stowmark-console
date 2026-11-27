@@ -32,6 +32,10 @@ func (h InitRepository) Handle(ctx context.Context, command cqs.Command) ([]even
 		return nil, cqs.NewInvalidCommandError(InitRepositoryCommandName, command.Name())
 	}
 
+	if err := cmd.Options.Validate(); err != nil {
+		return nil, err
+	}
+
 	if err := h.repository.Initialize(ctx, cmd.Options); err != nil {
 		return nil, err
 	}

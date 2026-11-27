@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -10,12 +11,9 @@ import (
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 )
 
-type encryptedInitRequested struct{}
-
-type initConfirmationRequested struct{}
-
 type encryptedInitFolderChosen struct {
-	folder string
+	folder  string
+	options repository.InitOptions
 }
 
 type encryptedRepositoryInitializedMsg struct {
@@ -24,32 +22,9 @@ type encryptedRepositoryInitializedMsg struct {
 	err     error
 }
 
-func (m *Model) openEncryptedInitDialog() {
-	m.dialog = newPromptDialog(
-		"Initialize "+m.current.Name()+" encrypted",
-		"Folder for the new key pair",
-		defaultKeysFolder(),
-		"[Tab] Complete  [↑↓] Suggestions  [Enter] Initialize  [Esc] Back",
-		func(value string) (tea.Msg, error) {
-			if _, err := describeKeysFolder(value); err != nil {
-				return nil, err
-			}
-			folder, err := resolveLocalPath(value)
-			if err != nil {
-				return nil, err
-			}
-			return encryptedInitFolderChosen{folder: folder}, nil
-		},
-		emit(initConfirmationRequested{}),
-	).withCompletion(
-		func(value string) []string { return pathSuggestions(value, nil) },
-		describeKeysFolder,
-	)
-}
-
-func (m *Model) initEncryptedRepository(folder string) tea.Cmd {
+func (m *Model) initEncryptedRepository(folder string, options repository.InitOptions) tea.Cmd {
 	bus := m.buses.Commands
-	profile := m.current
+	profile := m.current.WithInit(options)
 	return m.startOperation("Generating a key pair and initializing "+profile.Name()+" encrypted...", func(ctx context.Context) tea.Msg {
 		events, err := bus.Handle(ctx, app.InitEncryptedRepositoryCommand{Profile: profile, KeysFolder: folder})
 		msg := encryptedRepositoryInitializedMsg{err: err}
@@ -72,7 +47,7 @@ func (m *Model) handleEncryptedInitialized(msg *encryptedRepositoryInitializedMs
 	}
 
 	m.current = msg.profile
-	m.message = "Repository " + m.current.Name() + " initialized encrypted (format version 3)"
+	m.message = fmt.Sprintf("Repository %s initialized encrypted (format version %d)", m.current.Name(), m.current.Init().FormatVersion())
 	m.dialog = &infoDialog{title: "Repository " + m.current.Name() + " encrypted", body: encryptedInitSummary(m.current.Name(), msg.keys)}
 
 	return m.loadSnapshots("")
@@ -87,12 +62,10 @@ func encryptedInitSummary(name string, keys encryption.KeyPair) string {
 	if name == environmentRepositoryName {
 		body.WriteString("set:\n\n")
 		body.WriteString(highlightStyle.Render("    STOWMARK_PUBLIC_KEY="+keys.PublicKey()) + "\n")
-		body.WriteString(highlightStyle.Render("    STOWMARK_PRIVATE_KEY="+keys.PrivateKey()) + "\n")
-		body.WriteString(highlightStyle.Render("    STOWMARK_FORMAT_VERSION=3"))
+		body.WriteString(highlightStyle.Render("    STOWMARK_PRIVATE_KEY=" + keys.PrivateKey()))
 	} else {
 		body.WriteString("add to " + highlightStyle.Render(name) + "\nin repositories.yaml:\n\n")
-		body.WriteString(configurationLines(keys.PublicKey(), keys.PrivateKey()) + "\n")
-		body.WriteString(highlightStyle.Render("    format_version: 3"))
+		body.WriteString(configurationLines(keys.PublicKey(), keys.PrivateKey()))
 	}
 	body.WriteString("\n\n" + errorStyle.Render("Keep the private key safe: without it the repository cannot be read."))
 

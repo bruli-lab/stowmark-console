@@ -89,6 +89,20 @@ func TestInitRepository(t *testing.T) {
 
 		require.ErrorIs(t, err, errBackend)
 	})
+
+	t.Run(`Given an unknown compression
+	When the repository is initialized
+	Then it is rejected before reaching the repository`, func(t *testing.T) {
+		t.Parallel()
+		repo := &mocks.RepositoryMock{}
+
+		_, err := app.NewInitRepository(repo).Handle(t.Context(), app.InitRepositoryCommand{
+			Options: repository.NewInitOptions("brotli", nil, nil),
+		})
+
+		require.ErrorIs(t, err, repository.ErrInvalidCompression)
+		require.Empty(t, repo.InitializeCalls())
+	})
 }
 
 func TestUnlockRepository(t *testing.T) {

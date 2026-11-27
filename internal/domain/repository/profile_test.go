@@ -124,9 +124,10 @@ func TestProfileRetention(t *testing.T) {
 
 	t.Run(`Given an unencrypted profile
 	When it gets a key pair
-	Then it is encrypted with format version 3, keeps its compression and has the private key`, func(t *testing.T) {
+	Then it is encrypted, keeps its other init options and has the private key`, func(t *testing.T) {
 		t.Parallel()
-		base := repository.NewProfile("nas", "/backups", repository.NewInitOptions("zstd", nil, nil))
+		options := repository.NewInitOptions("zstd", nil, nil).WithFormatVersion(repository.LatestFormatVersion)
+		base := repository.NewProfile("nas", "/backups", repository.NewInitOptions("", nil, nil)).WithInit(options)
 
 		profile := base.WithKeys("/keys/a-public.pem", "/keys/a-private.pem")
 

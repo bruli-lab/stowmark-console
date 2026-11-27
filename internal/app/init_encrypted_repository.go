@@ -41,6 +41,10 @@ func (h InitEncryptedRepository) Handle(ctx context.Context, command cqs.Command
 		return nil, ErrRepositoryNameRequired
 	}
 
+	if err := cmd.Profile.Init().Validate(); err != nil {
+		return nil, err
+	}
+
 	generation, err := encryption.NewKeyGeneration(cmd.KeysFolder)
 	if err != nil {
 		return nil, err

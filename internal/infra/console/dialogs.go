@@ -236,51 +236,7 @@ func (m *Model) openInitConfirmation() {
 		declineHint = "Choose another repository"
 	}
 
-	var body strings.Builder
-
-	body.WriteString("No Stowmark repository found at:\n")
-	body.WriteString(highlightStyle.Render(m.current.Location()))
-	body.WriteString("\n\nA new repository will be created with:")
-	body.WriteString("\n  Encryption:  " + encryptionSummary(m.current.Init()))
-	body.WriteString("\n  Compression: " + compressionSummary(m.current.Init()))
-	body.WriteString("\n  Format:      " + formatSummary(m.current.Init()))
-	if note := formatRecommendation(m.current.Init()); note != "" {
-		body.WriteString("\n\n" + mutedStyle.Render(note))
-	}
-
-	if !m.current.Encrypted() {
-		m.dialog = &choiceDialog{
-			title: "Initialize repository " + m.current.Name(),
-			body:  body.String(),
-			note:  initRepositoryWarning(m.current),
-			choices: []choice{
-				{
-					key:         "y",
-					label:       "Initialize",
-					description: "as configured, without encryption",
-					cmd:         emit(repositoryInitConfirmed{}),
-				},
-				{
-					key:         "e",
-					label:       "Initialize encrypted",
-					description: "generates a new key pair and uses format version 3",
-					cmd:         emit(encryptedInitRequested{}),
-				},
-			},
-			cancelHint: declineHint,
-			onCancel:   emit(repositoryInitDeclined{}),
-		}
-		return
-	}
-
-	m.dialog = &confirmDialog{
-		title:     "Initialize repository " + m.current.Name(),
-		body:      body.String(),
-		warning:   initRepositoryWarning(m.current),
-		hint:      "[y] Initialize  [n/Esc] " + declineHint,
-		onConfirm: emit(repositoryInitConfirmed{}),
-		onCancel:  emit(repositoryInitDeclined{}),
-	}
+	m.dialog = newInitForm(&m.current, initRepositoryWarning(m.current), declineHint)
 }
 
 func (m *Model) openCreateDialog() {

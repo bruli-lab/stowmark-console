@@ -62,9 +62,8 @@ func (m *Model) checkRepository() tea.Cmd {
 	})
 }
 
-func (m *Model) initRepository() tea.Cmd {
+func (m *Model) initRepository(options repository.InitOptions) tea.Cmd {
 	bus := m.buses.Commands
-	options := m.current.Init()
 	return m.startOperation("Initializing repository...", func(ctx context.Context) tea.Msg {
 		event, err := dispatch[repository.Initialized](ctx, bus, app.InitRepositoryCommand{Options: options})
 		return repositoryInitializedMsg{event: event, err: err}

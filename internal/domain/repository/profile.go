@@ -39,9 +39,14 @@ func NewProfile(name, location string, init InitOptions) Profile {
 }
 
 func (p Profile) WithKeys(publicKey, privateKey string) Profile {
-	init := p.Init().WithPublicKey(publicKey).WithFormatVersion(LatestFormatVersion)
+	init := p.Init().WithPublicKey(publicKey)
 	p.init = &init
 	p.privateKey = &privateKey
+	return p
+}
+
+func (p Profile) WithInit(options InitOptions) Profile {
+	p.init = &options
 	return p
 }
 
