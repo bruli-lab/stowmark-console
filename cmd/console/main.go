@@ -69,6 +69,7 @@ func runConsole(conf *config.Config) (err error) {
 		Snapshots:    store.NewSnapshots(session),
 		Keys:         store.NewKeys(session),
 		Retention:    store.NewRetention(session),
+		Checker:      store.NewChecker(session),
 	})
 	openDirectory, err := os.MkdirTemp("", "stowmark-console-open-*")
 	if err != nil {

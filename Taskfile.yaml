@@ -39,6 +39,7 @@ tasks:
         go tool moq -rm -out internal/mocks/snapshot_repository.go -pkg mocks ./internal/domain/snapshot Repository:SnapshotRepositoryMock
         go tool moq -rm -out internal/mocks/keys.go -pkg mocks ./internal/domain/encryption Keys:KeysMock
         go tool moq -rm -out internal/mocks/retention.go -pkg mocks ./internal/domain/retention Repository:RetentionRepositoryMock
+        go tool moq -rm -out internal/mocks/checker.go -pkg mocks ./internal/domain/integrity Checker:CheckerMock
 
   env:keys:
     desc: Generate the SSH key used by the local SSH server

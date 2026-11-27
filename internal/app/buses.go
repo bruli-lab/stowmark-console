@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/bruli-lab/go-core/cqs"
 	"github.com/bruli-lab/stowmark-console/internal/domain/encryption"
+	"github.com/bruli-lab/stowmark-console/internal/domain/integrity"
 	"github.com/bruli-lab/stowmark-console/internal/domain/repository"
 	"github.com/bruli-lab/stowmark-console/internal/domain/retention"
 	"github.com/bruli-lab/stowmark-console/internal/domain/snapshot"
@@ -19,6 +20,7 @@ type Ports struct {
 	Snapshots    snapshot.Repository
 	Keys         encryption.Keys
 	Retention    retention.Repository
+	Checker      integrity.Checker
 }
 
 func NewBuses(ports *Ports) Buses {
@@ -41,6 +43,7 @@ func NewBuses(ports *Ports) Buses {
 	queries.Subscribe(RepositoryStatusQueryName, NewRepositoryStatus(ports.Repositories))
 	queries.Subscribe(PlanForgetQueryName, NewPlanForget(ports.Retention))
 	queries.Subscribe(PlanPruneQueryName, NewPlanPrune(ports.Retention))
+	queries.Subscribe(CheckRepositoryQueryName, NewCheckRepository(ports.Checker))
 	queries.Subscribe(ListSnapshotsQueryName, NewListSnapshots(ports.Snapshots))
 	queries.Subscribe(GetManifestQueryName, NewGetManifest(ports.Snapshots))
 	queries.Subscribe(GetFileContentQueryName, NewGetFileContent(ports.Snapshots))

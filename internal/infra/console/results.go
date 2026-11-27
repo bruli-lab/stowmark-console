@@ -102,6 +102,9 @@ func (m *Model) handleResult(msg tea.Msg) tea.Cmd {
 	case repositoryUnlockedMsg:
 		m.handleUnlocked(&msg)
 
+	case repositoryCheckedMsg:
+		m.handleChecked(&msg)
+
 	case forgetPlannedMsg, snapshotsForgottenMsg, prunePlannedMsg, repositoryPrunedMsg:
 		return m.handleRetentionResult(msg)
 
